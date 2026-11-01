@@ -1,0 +1,14 @@
+{
+  "name": "freellmapi-roundtable",
+  "version": "0.1.0",
+  "description": "A shared group chat for the models behind your FreeLLMAPI: set the lineup once, and every model sees the whole thread.",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/e2e.js",
+    "screenshots": "node test/screenshots.js"
+  },
+  "engines": { "node": ">=18" },
+  "devDependencies": { "playwright": "^1.49.0" }
+}

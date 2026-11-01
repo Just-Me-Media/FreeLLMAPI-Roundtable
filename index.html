@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Roundtable</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a64; --line: #e4e2da;
+    --accent: #1f5f4a; --accent-ink: #ffffff; --danger: #b3261e; --warn-bg: #fff4e0;
+    --c0: #2f6fb0; --c1: #b05a2f; --c2: #6a8f2a; --c3: #8a3fa8; --c4: #b0912f; --c5: #2a8f86;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 16px rgba(0,0,0,.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413; --panel: #1e1e1c; --ink: #ecebe6; --muted: #9a988f; --line: #33322e;
+      --accent: #5bb89a; --accent-ink: #0d1f19; --danger: #f2837c; --warn-bg: #3a2f17;
+      --c0: #6aa7e6; --c1: #e6955f; --c2: #a3cc5c; --c3: #c88ae0; --c4: #e0c35f; --c5: #5fcfc4;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141413; --panel: #1e1e1c; --ink: #ecebe6; --muted: #9a988f; --line: #33322e;
+    --accent: #5bb89a; --accent-ink: #0d1f19; --danger: #f2837c; --warn-bg: #3a2f17;
+    --c0: #6aa7e6; --c1: #e6955f; --c2: #a3cc5c; --c3: #c88ae0; --c4: #e0c35f; --c5: #5fcfc4;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .01em; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.ok { background: #3fae6a; } .dot.bad { background: var(--danger); }
+  #status { color: var(--muted); font-size: 13px; }
+  .spacer { flex: 1; }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+    padding: 6px 12px; font-size: 13px;
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  .btn.danger { color: var(--danger); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  .lineup-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+    font-size: 13px; color: var(--muted);
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px;
+    border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: var(--bg);
+  }
+  .chip i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .chip b { font-weight: 600; }
+  .arrow { color: var(--muted); }
+
+  main { flex: 1; overflow-y: auto; padding: 20px 16px 12px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .empty { text-align: center; color: var(--muted); margin-top: 12vh; }
+  .empty h2 { color: var(--ink); font-size: 20px; margin: 0 0 6px; }
+
+  .msg { display: flex; gap: 10px; margin: 0 0 14px; }
+  .msg .avatar {
+    width: 30px; height: 30px; border-radius: 8px; flex: none; display: grid; place-items: center;
+    font-weight: 700; font-size: 13px; color: #fff;
+  }
+  .msg .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 9px 13px 11px; box-shadow: var(--shadow); min-width: 0; flex: 1;
+    border-left: 3px solid var(--tint, var(--line));
+  }
+  .msg.user { flex-direction: row-reverse; }
+  .msg.user .card { flex: 0 1 auto; max-width: 80%; background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .msg.user .avatar { background: var(--muted); }
+  .msg.user .meta { color: inherit; opacity: .85; }
+  .meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-bottom: 3px; }
+  .meta .who { font-weight: 700; color: var(--tint, var(--ink)); }
+  .meta .via { background: var(--warn-bg); padding: 0 6px; border-radius: 6px; }
+  .meta .x { margin-left: auto; border: 0; background: none; color: var(--muted); opacity: 0; padding: 0 4px; }
+  .msg:hover .meta .x { opacity: 1; }
+  .body { white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
+  .body pre {
+    background: rgba(127,127,127,.12); border-radius: 8px; padding: 8px 10px; overflow-x: auto;
+    margin: 6px 0; white-space: pre; font-size: 13px;
+  }
+  .body code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; }
+  .body :not(pre) > code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; }
+  .typing::after { content: "▍"; animation: blink 1s steps(2) infinite; color: var(--muted); }
+  @keyframes blink { 50% { opacity: 0; } }
+  .msg.err .card { border-left-color: var(--danger); }
+  .err-text { color: var(--danger); }
+  .err-actions { margin-top: 6px; display: flex; gap: 8px; }
+
+  footer { border-top: 1px solid var(--line); background: var(--panel); padding: 10px 16px 14px; }
+  .composer { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
+  textarea#input {
+    width: 100%; min-height: 54px; max-height: 200px; resize: vertical;
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg);
+  }
+  textarea#input:focus, input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .hint { color: var(--muted); font-size: 12px; }
+
+  /* Setup drawer */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: none; z-index: 10; }
+  .overlay.open { display: block; }
+  .drawer {
+    position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 100vw);
+    background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 18px 18px 40px;
+  }
+  .drawer h2 { margin: 0 0 4px; font-size: 18px; }
+  .drawer h3 { margin: 22px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+  .field label { font-size: 13px; color: var(--muted); }
+  input[type=text], input[type=password], input[type=number], select, textarea.t {
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; background: var(--bg); width: 100%;
+  }
+  textarea.t { min-height: 60px; resize: vertical; }
+  .slot { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin-bottom: 8px; background: var(--bg); border-left: 4px solid var(--tint); }
+  .slot .top { display: flex; gap: 6px; align-items: center; }
+  .slot .num { font-weight: 700; color: var(--tint); width: 18px; }
+  .slot .mid { font-size: 12px; color: var(--muted); margin: 4px 0 6px 24px; word-break: break-all; }
+  .slot textarea.t { margin-left: 24px; width: calc(100% - 24px); min-height: 44px; }
+  .iconbtn { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; width: 28px; height: 28px; }
+  .iconbtn:disabled { opacity: .35; cursor: default; }
+  .modellist { max-height: 220px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; margin-top: 6px; }
+  .modelitem { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .modelitem:last-child { border-bottom: 0; }
+  .modelitem span { flex: 1; word-break: break-all; }
+  .note { font-size: 12px; color: var(--muted); }
+  .banner { background: var(--warn-bg); border-radius: 8px; padding: 8px 10px; font-size: 13px; margin: 8px 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="dot" id="dot"></span>
+  <h1>Roundtable</h1>
+  <span id="status">checking…</span>
+  <span class="spacer"></span>
+  <button class="btn" id="btnSetup">Setup</button>
+  <button class="btn" id="btnExport">Export</button>
+  <button class="btn danger" id="btnClear">New chat</button>
+</header>
+
+<div class="lineup-bar" id="lineupBar"></div>
+
+<main id="main"><div class="wrap" id="chat"></div></main>
+
+<footer>
+  <div class="composer">
+    <textarea id="input" placeholder="Ask the table something…  (Enter to send, Shift+Enter for a new line)"></textarea>
+    <div class="row">
+      <button class="btn primary" id="btnSend">Send to the table</button>
+      <button class="btn" id="btnAgain" title="Run another round with no new message so the models respond to each other">Another round</button>
+      <button class="btn danger" id="btnStop" disabled>Stop</button>
+      <span class="spacer"></span>
+      <span class="hint" id="roundHint"></span>
+    </div>
+  </div>
+</footer>
+
+<div class="overlay" id="overlay">
+  <div class="drawer" role="dialog" aria-label="Setup">
+    <div class="row"><h2>Setup</h2><span class="spacer"></span><button class="btn" id="btnClose">Done</button></div>
+    <div class="note">One-time. Saved in this browser, so next time you just open the page.</div>
+    <div class="banner" id="setupBanner" style="display:none"></div>
+
+    <h3>1. FreeLLMAPI key</h3>
+    <div class="field">
+      <label for="key">Unified key (starts with freellmapi-)</label>
+      <input type="password" id="key" placeholder="freellmapi-…" autocomplete="off">
+    </div>
+    <div class="row"><button class="btn" id="btnLoad">Load models</button><span class="note" id="loadNote"></span></div>
+
+    <h3>2. Who is at the table, in answer order</h3>
+    <div id="slots"></div>
+    <div class="row">
+      <button class="btn" id="btnQuick">Quick start with my best models</button>
+      <span class="note">Picks Dots3, GPT-OSS 120B, Muse Glimmer and North Mini Code if they exist.</span>
+    </div>
+    <div class="field" style="margin-top:10px">
+      <label for="search">Add a model</label>
+      <input type="text" id="search" placeholder="Search model ids…">
+    </div>
+    <div class="modellist" id="modellist"><div class="modelitem"><span class="note">Click “Load models” first.</span></div></div>
+
+    <h3>3. How a turn works</h3>
+    <div class="field">
+      <label for="rounds">Rounds per message</label>
+      <select id="rounds">
+        <option value="1">1: each model answers once, in order</option>
+        <option value="2">2: models answer, then react to each other</option>
+        <option value="3">3: three passes</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fallback">If a model errors, retry once with</label>
+      <input type="text" id="fallback" placeholder="auto  (leave empty to disable)">
+    </div>
+    <div class="field">
+      <label for="preamble">Shared instructions (sent to every model)</label>
+      <textarea class="t" id="preamble"></textarea>
+    </div>
+    <div class="field">
+      <label for="maxTokens">Max reply tokens (0 = provider default)</label>
+      <input type="number" id="maxTokens" min="0" step="100">
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const DEFAULT_PREAMBLE =
+    'You are one participant in a group conversation with a human and several other AI models. ' +
+    'Messages from other participants appear as "[Name]: text". Read them, build on good points, ' +
+    'push back where they are wrong, and do not repeat what has already been said. ' +
+    'Reply as yourself without prefixing your own name. Keep replies focused.';
+
+  const QUICK = ['dots3', 'gpt-oss 120b|gpt-oss-120b', 'muse glimmer', 'north mini code|north-mini'];
+
+  // ---------- state ----------
+  const S = {
+    cfg: { key: '', slots: [], rounds: 1, fallback: 'auto', preamble: DEFAULT_PREAMBLE, maxTokens: 0 },
+    msgs: [],
+    models: [],
+    running: false,
+    abort: null,
+  };
+  let uid = 0;
+  const nid = () => Date.now().toString(36) + (uid++).toString(36);
+
+  const $ = id => document.getElementById(id);
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  const save = () => { store.set('rt.cfg', S.cfg); store.set('rt.msgs', S.msgs.filter(m => !m.pending)); };
+
+  // ---------- helpers ----------
+  const tint = i => `var(--c${i % 6})`;
+  const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function renderMd(text) {
+    const parts = String(text).split(/```/);
+    return parts.map((p, i) => {
+      if (i % 2 === 1) {
+        const nl = p.indexOf('\n');
+        const code = nl >= 0 && /^[\w+-]*$/.test(p.slice(0, nl).trim()) ? p.slice(nl + 1) : p;
+        return '<pre><code>' + esc(code.replace(/\n$/, '')) + '</code></pre>';
+      }
+      return esc(p).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+    }).join('');
+  }
+  function shortName(id) {
+    return id.replace(/^.*\//, '').replace(/[-_:]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).slice(0, 28);
+  }
+  const slotIndex = id => S.cfg.slots.findIndex(s => s.id === id);
+
+  // ---------- status ----------
+  async function checkHealth() {
+    try {
+      const r = await fetch('/health');
+      const j = await r.json();
+      $('dot').className = 'dot ' + (j.upstream ? 'ok' : 'bad');
+      $('status').textContent = j.upstream ? 'FreeLLMAPI connected' : 'FreeLLMAPI is not running at ' + j.target;
+    } catch {
+      $('dot').className = 'dot bad';
+      $('status').textContent = 'Roundtable server not reachable';
+    }
+  }
+
+  // ---------- rendering ----------
+  function renderLineup() {
+    const bar = $('lineupBar');
+    if (!S.cfg.slots.length) { bar.innerHTML = '<span>No models yet. Open Setup to build your table.</span>'; }
+    else {
+      bar.innerHTML = '<span>Answer order:</span>' + S.cfg.slots.map((s, i) =>
+        `<span class="chip"><i style="background:${tint(i)}"></i><b>${i + 1}</b> ${esc(s.name)}</span>`
+      ).join('<span class="arrow">→</span>');
+    }
+    const reqs = S.cfg.slots.length * S.cfg.rounds;
+    $('roundHint').textContent = S.cfg.slots.length
+      ? `${S.cfg.slots.length} model${S.cfg.slots.length > 1 ? 's' : ''} × ${S.cfg.rounds} round${S.cfg.rounds > 1 ? 's' : ''} = ${reqs} request${reqs > 1 ? 's' : ''} per message`
+      : '';
+  }
+
+  function msgHtml(m) {
+    if (m.role === 'user') {
+      return `<div class="msg user" data-id="${m.id}"><div class="card"><div class="meta"><span class="who" style="color:inherit">You</span><button class="x" data-del="${m.id}" title="Delete">✕</button></div><div class="body">${esc(m.text)}</div></div><div class="avatar">Y</div></div>`;
+    }
+    const i = slotIndex(m.slot);
+    const col = i >= 0 ? tint(i) : 'var(--muted)';
+    const initial = esc((m.name || '?').trim().charAt(0).toUpperCase());
+    const via = m.via ? `<span class="via">via ${esc(m.via)}</span>` : '';
+    if (m.error) {
+      return `<div class="msg err" data-id="${m.id}" style="--tint:${col}"><div class="avatar" style="background:${col}">${initial}</div><div class="card"><div class="meta"><span class="who">${esc(m.name)}</span>${via}<button class="x" data-del="${m.id}" title="Delete">✕</button></div><div class="err-text">${esc(m.error)}</div><div class="err-actions"><button class="btn" data-retry="${m.id}">Retry this model</button></div></div></div>`;
+    }
+    return `<div class="msg" data-id="${m.id}" style="--tint:${col}"><div class="avatar" style="background:${col}">${initial}</div><div class="card"><div class="meta"><span class="who">${esc(m.name)}</span>${via}<button class="x" data-del="${m.id}" title="Delete">✕</button></div><div class="body${m.pending ? ' typing' : ''}">${renderMd(m.text || '')}</div></div></div>`;
+  }
+
+  function renderChat() {
+    const chat = $('chat');
+    if (!S.msgs.length) {
+      chat.innerHTML = `<div class="empty"><h2>Your table is set</h2><div>${S.cfg.slots.length ? 'Ask something below. Each model answers in order and sees everything said before it.' : 'Open Setup, add a few models, then ask your first question.'}</div></div>`;
+      return;
+    }
+    chat.innerHTML = S.msgs.map(msgHtml).join('');
+  }
+  function updateMsgEl(m) {
+    const el = document.querySelector(`.msg[data-id="${m.id}"]`);
+    if (!el) return renderChat();
+    const body = el.querySelector('.body');
+    if (body) { body.innerHTML = renderMd(m.text || ''); body.classList.toggle('typing', !!m.pending); }
+  }
+  function scrollDown(force) {
+    const main = $('main');
+    const near = main.scrollHeight - main.scrollTop - main.clientHeight < 160;
+    if (force || near) main.scrollTop = main.scrollHeight;
+  }
+  function setRunning(v) {
+    S.running = v;
+    $('btnSend').disabled = v; $('btnAgain').disabled = v; $('btnStop').disabled = !v;
+  }
+
+  // ---------- building the prompt for one model ----------
+  function buildMessages(slot) {
+    const sys = [S.cfg.preamble.trim(),
+      `You are "${slot.name}".` + (slot.role.trim() ? ' ' + slot.role.trim() : ''),
+      'Participants in answer order: ' + S.cfg.slots.map(s => s.name).join(', ') + '.'
+    ].filter(Boolean).join('\n\n');
+
+    const out = [{ role: 'system', content: sys }];
+    const push = (role, content) => {
+      const last = out[out.length - 1];
+      if (last.role === role && role !== 'system') last.content += '\n\n' + content;
+      else out.push({ role, content });
+    };
+    for (const m of S.msgs) {
+      if (m.error || m.pending && !m.text) continue;
+      if (!m.text || !m.text.trim()) continue;
+      if (m.role === 'user') push('user', m.text);
+      else if (m.slot === slot.id) push('assistant', m.text);
+      else push('user', `[${m.name}]: ${m.text}`);
+    }
+    if (out[out.length - 1].role !== 'user') push('user', '(Your turn. Continue the discussion.)');
+    return out;
+  }
+
+  // ---------- calling the model ----------
+  async function streamChat(model, messages, onDelta, signal) {
+    const body = { model, messages, stream: true };
+    if (S.cfg.maxTokens > 0) body.max_tokens = S.cfg.maxTokens;
+    const headers = { 'Content-Type': 'application/json' };
+    if (S.cfg.key) headers.Authorization = 'Bearer ' + S.cfg.key;
+    const r = await fetch('/v1/chat/completions', { method: 'POST', headers, body: JSON.stringify(body), signal });
+    if (!r.ok) {
+      let msg = r.status + ' ' + r.statusText;
+      try { const j = await r.json(); msg = (j.error && (j.error.message || j.error)) || j.message || msg; } catch {}
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+    const ct = r.headers.get('content-type') || '';
+    if (!ct.includes('text/event-stream')) {
+      const j = await r.json();
+      const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (t) onDelta(t);
+      return;
+    }
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if (data === '[DONE]') return;
+        try {
+          const j = JSON.parse(data);
+          if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
+          const d = j.choices && j.choices[0] && j.choices[0].delta;
+          if (d && d.content) onDelta(d.content);
+        } catch (e) { if (e instanceof SyntaxError) continue; throw e; }
+      }
+    }
+  }
+
+  async function speak(slot, signal) {
+    const m = { id: nid(), role: 'model', slot: slot.id, name: slot.name, text: '', pending: true };
+    S.msgs.push(m); renderChat(); scrollDown(true);
+    const messages = buildMessages(slot);
+    const attempt = async model => {
+      m.text = '';
+      await streamChat(model, messages, d => { m.text += d; updateMsgEl(m); scrollDown(); }, signal);
+      if (!m.text.trim()) throw new Error('Empty reply');
+    };
+    try {
+      try {
+        await attempt(slot.model);
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        const fb = (S.cfg.fallback || '').trim();
+        if (!fb || fb === slot.model) throw e;
+        m.via = fb; await attempt(fb);
+      }
+      m.pending = false;
+    } catch (e) {
+      m.pending = false;
+      if (e.name === 'AbortError') { if (!m.text.trim()) S.msgs.splice(S.msgs.indexOf(m), 1); else m.text += '\n\n[stopped]'; }
+      else { m.error = e.message || String(e); m.text = ''; delete m.via; }
+    }
+    renderChat(); scrollDown(true); save();
+  }
+
+  async function runRounds(slots, rounds) {
+    if (!slots.length) { openSetup('Add at least one model to the table first.'); return; }
+    setRunning(true);
+    S.abort = new AbortController();
+    try {
+      for (let r = 0; r < rounds; r++) {
+        for (const slot of slots) {
+          if (S.abort.signal.aborted) return;
+          await speak(slot, S.abort.signal);
+        }
+      }
+    } finally { setRunning(false); S.abort = null; save(); }
+  }
+
+  // ---------- chat actions ----------
+  function send() {
+    if (S.running) return;
+    const text = $('input').value.trim();
+    if (!text) return;
+    S.msgs.push({ id: nid(), role: 'user', text });
+    $('input').value = '';
+    renderChat(); scrollDown(true); save();
+    runRounds(S.cfg.slots, S.cfg.rounds);
+  }
+  function again() {
+    if (S.running || !S.msgs.length) return;
+    runRounds(S.cfg.slots, 1);
+  }
+  function retry(id) {
+    if (S.running) return;
+    const i = S.msgs.findIndex(m => m.id === id);
+    if (i < 0) return;
+    const slot = S.cfg.slots.find(s => s.id === S.msgs[i].slot);
+    S.msgs.splice(i, 1);
+    if (!slot) { renderChat(); return; }
+    runRounds([slot], 1);
+  }
+
+  // ---------- setup drawer ----------
+  function openSetup(msg) {
+    $('overlay').classList.add('open');
+    const b = $('setupBanner');
+    if (msg) { b.textContent = msg; b.style.display = 'block'; } else b.style.display = 'none';
+    renderSlots(); renderModelList();
+  }
+  function closeSetup() { $('overlay').classList.remove('open'); renderLineup(); renderChat(); save(); }
+
+  function renderSlots() {
+    const box = $('slots');
+    if (!S.cfg.slots.length) { box.innerHTML = '<div class="note" style="margin-bottom:8px">Nobody yet. Add models below.</div>'; return; }
+    box.innerHTML = S.cfg.slots.map((s, i) => `
+      <div class="slot" style="--tint:${tint(i)}" data-slot="${s.id}">
+        <div class="top">
+          <span class="num">${i + 1}</span>
+          <input type="text" value="${esc(s.name)}" data-field="name" aria-label="Display name">
+          <button class="iconbtn" data-up="${s.id}" ${i === 0 ? 'disabled' : ''} title="Answer earlier">↑</button>
+          <button class="iconbtn" data-down="${s.id}" ${i === S.cfg.slots.length - 1 ? 'disabled' : ''} title="Answer later">↓</button>
+          <button class="iconbtn" data-rm="${s.id}" title="Remove">✕</button>
+        </div>
+        <div class="mid">${esc(s.model)}</div>
+        <textarea class="t" data-field="role" placeholder="Optional role, e.g. “Play devil's advocate” or “Write the final summary”">${esc(s.role)}</textarea>
+      </div>`).join('');
+  }
+
+  function renderModelList() {
+    const q = $('search').value.trim().toLowerCase();
+    const list = S.models.filter(m => !q || m.toLowerCase().includes(q)).slice(0, 120);
+    $('modellist').innerHTML = S.models.length
+      ? (list.map(m => `<div class="modelitem"><span>${esc(m)}</span><button class="btn" data-add="${esc(m)}">Add</button></div>`).join('') || '<div class="modelitem"><span class="note">No matches.</span></div>')
+      : '<div class="modelitem"><span class="note">Click “Load models” first.</span></div>';
+  }
+
+  function addSlot(model) {
+    S.cfg.slots.push({ id: nid(), model, name: shortName(model), role: '' });
+    renderSlots(); save();
+  }
+
+  async function loadModels() {
+    const note = $('loadNote');
+    note.textContent = 'Loading…';
+    S.cfg.key = $('key').value.trim();
+    try {
+      const headers = S.cfg.key ? { Authorization: 'Bearer ' + S.cfg.key } : {};
+      const r = await fetch('/v1/models', { headers });
+      if (!r.ok) {
+        let msg = r.status + ' ' + r.statusText;
+        try { const j = await r.json(); msg = (j.error && (j.error.message || j.error)) || msg; } catch {}
+        throw new Error(msg);
+      }
+      const j = await r.json();
+      S.models = (j.data || []).map(x => x.id).filter(Boolean).sort((a, b) => a.localeCompare(b));
+      note.textContent = S.models.length + ' models loaded';
+      store.set('rt.models', S.models);
+      renderModelList(); save();
+    } catch (e) { note.textContent = 'Failed: ' + e.message; }
+  }
+
+  function quickStart() {
+    if (!S.models.length) { $('loadNote').textContent = 'Load models first.'; return; }
+    const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const next = [];
+    for (const want of QUICK) {
+      const opts = want.split('|').map(norm);
+      const hit = S.models.find(m => opts.some(o => norm(m).includes(o)));
+      if (hit && !next.includes(hit)) next.push(hit);
+    }
+    if (!next.length) { $('loadNote').textContent = 'None of the quick-start models were found. Search and add manually.'; return; }
+    S.cfg.slots = next.map(m => ({ id: nid(), model: m, name: shortName(m), role: '' }));
+    $('loadNote').textContent = `Added ${next.length} model${next.length > 1 ? 's' : ''}. Reorder as you like.`;
+    renderSlots(); save();
+  }
+
+  function exportMd() {
+    const lines = ['# Roundtable chat', ''];
+    for (const m of S.msgs) {
+      if (m.error) continue;
+      lines.push(`**${m.role === 'user' ? 'You' : m.name}${m.via ? ' (via ' + m.via + ')' : ''}:**`, '', m.text, '');
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'roundtable-' + new Date().toISOString().slice(0, 10) + '.md';
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // ---------- wiring ----------
+  $('btnSend').onclick = send;
+  $('btnAgain').onclick = again;
+  $('btnStop').onclick = () => S.abort && S.abort.abort();
+  $('btnSetup').onclick = () => openSetup();
+  $('btnClose').onclick = closeSetup;
+  $('overlay').addEventListener('mousedown', e => { if (e.target.id === 'overlay') closeSetup(); });
+  $('btnExport').onclick = exportMd;
+  $('btnClear').onclick = () => { if (S.running) return; if (!S.msgs.length || confirm('Start a new chat? The current one will be cleared.')) { S.msgs = []; renderChat(); save(); } };
+  $('btnLoad').onclick = loadModels;
+  $('btnQuick').onclick = quickStart;
+  $('search').oninput = renderModelList;
+  $('input').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+
+  $('chat').addEventListener('click', e => {
+    const del = e.target.closest('[data-del]'); const re = e.target.closest('[data-retry]');
+    if (del && !S.running) { S.msgs = S.msgs.filter(m => m.id !== del.dataset.del); renderChat(); save(); }
+    if (re) retry(re.dataset.retry);
+  });
+  $('modellist').addEventListener('click', e => { const b = e.target.closest('[data-add]'); if (b) addSlot(b.dataset.add); });
+  $('slots').addEventListener('click', e => {
+    const up = e.target.closest('[data-up]'), dn = e.target.closest('[data-down]'), rm = e.target.closest('[data-rm]');
+    const s = S.cfg.slots;
+    if (up) { const i = slotIndex(up.dataset.up); if (i > 0) [s[i - 1], s[i]] = [s[i], s[i - 1]]; }
+    if (dn) { const i = slotIndex(dn.dataset.down); if (i >= 0 && i < s.length - 1) [s[i + 1], s[i]] = [s[i], s[i + 1]]; }
+    if (rm) { S.cfg.slots = s.filter(x => x.id !== rm.dataset.rm); $('loadNote').textContent = ''; }
+    if (up || dn || rm) { renderSlots(); save(); }
+  });
+  $('slots').addEventListener('input', e => {
+    const f = e.target.dataset.field; if (!f) return;
+    const slot = S.cfg.slots.find(x => x.id === e.target.closest('[data-slot]').dataset.slot);
+    if (slot) { slot[f] = e.target.value; save(); }
+  });
+  $('key').addEventListener('input', () => { S.cfg.key = $('key').value.trim(); save(); });
+  $('rounds').onchange = () => { S.cfg.rounds = Number($('rounds').value); renderLineup(); save(); };
+  $('fallback').oninput = () => { S.cfg.fallback = $('fallback').value; save(); };
+  $('preamble').oninput = () => { S.cfg.preamble = $('preamble').value; save(); };
+  $('maxTokens').oninput = () => { S.cfg.maxTokens = Math.max(0, Number($('maxTokens').value) || 0); save(); };
+
+  // ---------- boot ----------
+  const saved = store.get('rt.cfg');
+  if (saved) S.cfg = Object.assign(S.cfg, saved);
+  const savedMsgs = store.get('rt.msgs'); if (Array.isArray(savedMsgs)) S.msgs = savedMsgs;
+  const savedModels = store.get('rt.models'); if (Array.isArray(savedModels)) S.models = savedModels;
+  $('key').value = S.cfg.key || '';
+  $('rounds').value = String(S.cfg.rounds || 1);
+  $('fallback').value = S.cfg.fallback == null ? 'auto' : S.cfg.fallback;
+  $('preamble').value = S.cfg.preamble || DEFAULT_PREAMBLE;
+  $('maxTokens').value = S.cfg.maxTokens || 0;
+  renderLineup(); renderChat(); scrollDown(true);
+  checkHealth(); setInterval(checkHealth, 15000);
+  if (!S.cfg.slots.length) openSetup('First time here: paste your key, load models, then use Quick start or add models one by one.');
+})();
+</script>
+</body>
+</html>
