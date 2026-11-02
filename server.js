@@ -54,8 +54,23 @@ const json = (res, code, obj) => {
   res.end(JSON.stringify(obj));
 };
 
+// CORS: only the desktop app's own webview origins may read responses.
+const ALLOWED_ORIGINS = new Set(['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost']);
+function cors(req, res) {
+  const o = req.headers.origin;
+  if (!o || !ALLOWED_ORIGINS.has(o)) return;
+  res.setHeader('Access-Control-Allow-Origin', o);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] || 'Authorization, Content-Type, Accept');
+  res.setHeader('Access-Control-Max-Age', '600');
+  if (req.headers['access-control-request-private-network']) res.setHeader('Access-Control-Allow-Private-Network', 'true');
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
+  cors(req, res);
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
 
   if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
     fs.readFile(PAGE, (err, data) => {

@@ -32,9 +32,9 @@ if (-not (Test-Path $ConfPath)) {
 }
 
 # 3. Build
-Write-Host "Running: cargo tauri build --config $ConfFile -- --release" -ForegroundColor Yellow
+Write-Host "Running: cargo tauri build --config $ConfFile" -ForegroundColor Yellow
 Set-Location $SrcTauri
-cargo tauri build --config $ConfFile -- --release
+cargo tauri build --config $ConfFile
 if ($LASTEXITCODE -ne 0) {
     Write-Error "cargo tauri build failed (exit $LASTEXITCODE)"
     exit $LASTEXITCODE
