@@ -1,7 +1,7 @@
 {
   "name": "freellmapi-roundtable",
   "version": "0.1.0",
-  "description": "A shared group chat for the models behind your FreeLLMAPI: set the lineup once, and every model sees the whole thread.",
+  "description": "Bring local, cloud, and FreeLLMAPI models into one role-based shared conversation.",
   "private": true,
   "license": "MIT",
   "scripts": {

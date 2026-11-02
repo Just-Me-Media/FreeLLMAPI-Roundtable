@@ -1,8 +1,10 @@
-# Roundtable for FreeLLMAPI
+# Roundtable — One Conversation for Your AI Models
 
-**A collaborative group chat UI for your local and cloud LLMs via [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi), Ollama, and LM-Studio.**
+**Bring your local models, cloud models, and [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) models into one conversation.**
 
-Pick who sits at the table, set their order, and let models build on each other's work in real-time. Deliberation happens in one shared thread with streaming responses, live artifact generation, diffing, and role-based collaboration.
+Choose your models, give them different roles, and ask once. They take turns in the same shared conversation, seeing the earlier replies and building on each other's work. No switching between separate model chats or stitching answers together yourself.
+
+Roundtable streams replies as they arrive, can route through local engines such as Ollama and LM Studio, direct cloud providers, or FreeLLMAPI, and can extract a synthesizer's response as an artifact. Because models respond in sequence, total response time still depends on the models and providers you choose.
 
 ![A chat where models deliberate in sequence and collaborate on artifacts](docs/chat.png)
 
@@ -10,10 +12,10 @@ Pick who sits at the table, set their order, and let models build on each other'
 
 ## Key Features
 
-- **Sequential & Collaborative Deliberation**: Models see peer replies in order (`Model 1 drafts` → `Model 2 critiques` → `Model 3 synthesizes`).
+- **One Shared Conversation**: Models take turns in your chosen order, see prior replies, and contribute under assigned roles (`draft` → `critique` → `synthesize`).
 - **Live Artifact & Evolving Previews**: Models tagged with the `synthesizer` role produce documents, code, or web apps rendered live in a side panel (Markdown, HTML/CSS/JS sandbox, or code fences).
 - **In-Memory Version History & Diff**: Step back through revisions (`v1`, `v2`, ...) with an on-demand line differ (`🔀 Diff`).
-- **Local & Cloud Model Hybrid**: Auto-detects local Ollama (`:11434`) and LM-Studio (`:1234`) instances alongside your FreeLLMAPI cloud models.
+- **Local, Cloud & FreeLLMAPI Models**: Combine local Ollama (`:11434`) and LM Studio (`:1234`) models with FreeLLMAPI models or supported direct cloud providers in the same lineup.
 - **Quota & Cost Transparency**: Calculates exact `models × rounds` request volume before dispatching.
 - **Read-Only Consensus Gauge**: Real-time keyword overlap tracking (`🟢 High agreement`, `🟡 Partial agreement`, `🔴 Diverging`) to gauge convergence.
 - **Multimodal Ready**: Drag-and-drop, upload, or paste (`Cmd+V` / `Ctrl+V`) images directly into prompts for vision-enabled models.
@@ -67,19 +69,22 @@ npm start
 
 Open <http://localhost:5173>. On initial launch, the **Setup** drawer opens:
 
-1. **Local Models**: Click **Detect Local Models** to scan local ports (`11434` / `1234`).
-2. **Cloud Models**: Enter your FreeLLMAPI unified key (`freellmapi-...`) or individual provider key and click **Load FreeLLMAPI Models**.
-3. **Table Lineup**: Organize your model order and optionally assign roles (e.g., `Drafting`, `Critique`, `Synthesizer`).
-4. Click **Done**. Settings persist locally in your browser.
+1. **Choose model sources**: Detect local Ollama or LM Studio models, load models through FreeLLMAPI, or configure a supported direct provider.
+2. **Build your lineup**: Set the order and assign roles such as `Drafting`, `Critique`, and `Synthesizer`.
+3. **Start one conversation**: Send a prompt once. Each model takes its turn in the shared thread and can build on earlier replies.
+4. **Review the result**: Follow streamed responses in the conversation and view synthesized artifacts in the preview pane.
+
+Models respond one after another, not simultaneously. Roundtable removes the need to switch between separate model chats; it does not eliminate each model's generation time.
 
 ---
 
 ## How It Works
 
-Each participant receives an isolated, compliant view of the thread:
+Each participant takes a turn in the same conversation:
 
-- **System Prompt**: Incorporates shared instructions, assigned roles, and the participant roster.
-- **Merged User Turns**: Models observe peer replies formatted as `[Model Name]: ...` while maintaining standard alternating user/assistant API schemas.
+- **Shared context**: Every model receives the conversation, shared instructions, and its assigned role.
+- **Replies build on replies**: Earlier model responses are included with their names, so later participants can critique, extend, or synthesize the work.
+- **One place to follow along**: Responses stream into the same conversation instead of requiring a separate chat or screen for each model.
 - **Graceful Fallbacks**: If a provider rate-limits (429) or experiences downtime, Roundtable automatically re-routes via your designated fallback model with full provenance tagging.
 - **Session History**: Save, search, and recall past conversations with the built-in **Saved Chats** drawer.
 

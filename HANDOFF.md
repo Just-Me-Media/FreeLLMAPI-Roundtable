@@ -4,7 +4,7 @@
 
 **Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable
 
-**Purpose:** Build and test Windows desktop installer (MSI / NSIS) for Roundtable. Mac/Linux builds handled on M1 Pro.
+**Purpose:** Build and test the Windows desktop installer (MSI / NSIS) for Roundtable, which brings local, cloud, and FreeLLMAPI models into one role-based shared conversation. macOS builds are handled on the M1 Pro.
 
 **Status:** In progress — local build running (`cargo tauri build`).
 
