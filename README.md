@@ -21,24 +21,35 @@ Pick who sits at the table, set their order, and let models build on each other'
 
 ---
 
-## Download
+## 📥 Download Installers
 
-| Platform | Download |
-|:---------|:---------|
-| **macOS** (Apple Silicon, signed and notarized) | [Roundtable-macOS-AppleSilicon.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/latest/download/Roundtable-macOS-AppleSilicon.dmg) |
-| **Windows 11** | Coming soon. Watch [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases) |
-| **Web server** (any OS with Node.js 18+) | See [Quick Start](#quick-start-web-server) |
+### Windows
+**Download the latest Windows installer:**
+- [Roundtable-Windows-x64-v0.2.0-beta.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Windows-x64-v0.2.0-beta.exe) (NSIS Installer, 1.9 MB)
+- [Roundtable-Windows-x64-v0.2.0-beta.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Windows-x64-v0.2.0-beta.msi) (Windows Installer, 2.8 MB)
 
-All versions and release notes: [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases)
+**System Requirements:** Windows 10/11 64-bit, FreeLLMAPI running on localhost:31415
 
-* * *
+### macOS
+**Download the latest macOS installer:**
+- [Roundtable-macOS-x64-v0.2.0-beta.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-macOS-x64-v0.2.0-beta.dmg) (Apple Silicon & Intel)
+
+**System Requirements:** macOS 12+, FreeLLMAPI running on localhost:31415
+
+### Linux
+**Download the latest Linux installer:**
+- [Roundtable-Linux-x64-v0.2.0-beta.AppImage](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Linux-x64-v0.2.0-beta.AppImage)
+
+**System Requirements:** Linux x64 with glibc 2.31+, FreeLLMAPI running on localhost:31415
+
+---
 
 ## Choose Your Setup
 
 | Distribution | Best For | How to Run |
 | :--- | :--- | :--- |
 | **macOS Native App (`.dmg`)** | macOS users (Apple Silicon) wanting a native, zero-setup desktop app | Download the `.dmg` from [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases) |
-| **Windows Native App (`.exe`)** | Windows 11 users wanting a standalone, lightweight installer | Coming soon. Use the Web Server option below for now |
+| **Windows Native App (`.exe`/`.msi`)** | Windows 10/11 users wanting a standalone installer | Download from [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases) or see Download Installers above |
 | **Web Server (`Node.js`)** | Headless systems, servers, or local browsers | `npm start` (zero third-party dependencies) |
 
 ---
