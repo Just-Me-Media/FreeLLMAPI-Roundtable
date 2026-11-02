@@ -101,6 +101,14 @@ cargo tauri build
 
 ---
 
+## Support
+
+Roundtable is free, open source (MIT), and built and maintained by one person. If it saves you time, you can [buy me a coffee](https://buymeacoffee.com/justmemedia) to help me keep building. Bug reports, ideas, and stars on GitHub help just as much.
+
+Roundtable is an unofficial companion to [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi). Support here goes to Roundtable, not to the FreeLLMAPI project.
+
+* * *
+
 ## License
 
 [MIT](LICENSE) © Just Me Media. Unofficial companion project for FreeLLMAPI.
