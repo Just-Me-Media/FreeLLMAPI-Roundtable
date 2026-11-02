@@ -39,6 +39,9 @@
         "appPosition": { "x": 160, "y": 180 },
         "applicationFolderPosition": { "x": 440, "y": 180 }
       }
+    },
+    "windows": {
+      "staticVcruntime": false
     }
   }
 }
