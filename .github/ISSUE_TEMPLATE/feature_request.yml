@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an improvement or new capability.
+title: ""
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. Please describe the problem you're trying to solve and the desired outcome.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem are you trying to solve?
+      placeholder: Describe the current limitation.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like Roundtable to do?
+      placeholder: Describe the feature or workflow you want.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried workarounds or alternative approaches?
+      placeholder: List any workarounds or alternatives.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add screenshots, mockups, or examples if useful.
+      placeholder: Optional context.
