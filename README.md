@@ -21,6 +21,29 @@ Pick who sits at the table, set their order, and let models build on each other'
 
 ---
 
+## 📥 Download Installers
+
+### Windows
+**Download the latest Windows installer:**
+- [Roundtable-Windows-x64-v0.2.0-beta.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Windows-x64-v0.2.0-beta.exe) (NSIS Installer, 1.9 MB)
+- [Roundtable-Windows-x64-v0.2.0-beta.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Windows-x64-v0.2.0-beta.msi) (Windows Installer, 2.8 MB)
+
+**System Requirements:** Windows 10/11 64-bit, FreeLLMAPI running on localhost:31415
+
+### macOS
+**Download the latest macOS installer:**
+- [Roundtable-macOS-x64-v0.2.0-beta.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-macOS-x64-v0.2.0-beta.dmg) (Apple Silicon & Intel)
+
+**System Requirements:** macOS 12+, FreeLLMAPI running on localhost:31415
+
+### Linux
+**Download the latest Linux installer:**
+- [Roundtable-Linux-x64-v0.2.0-beta.AppImage](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Linux-x64-v0.2.0-beta.AppImage)
+
+**System Requirements:** Linux x64 with glibc 2.31+, FreeLLMAPI running on localhost:31415
+
+---
+
 ## Choose Your Setup
 
 | Distribution | Best For | How to Run |
