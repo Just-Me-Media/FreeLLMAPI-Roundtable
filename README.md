@@ -2,7 +2,7 @@
 
 **A collaborative group chat UI for your local and cloud LLMs via [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi), Ollama, and LM-Studio.**
 
-Pick who sits at the table, set their order, and let models build on each other's work in real-time. Deliberation happens in one shared thread with streaming responses, live artifact generation, diff tracking, and automatic fallback.
+Pick who sits at the table, set their order, and let models build on each other's work in real-time. Deliberation happens in one shared thread with streaming responses, live artifact generation, diffing, and role-based collaboration.
 
 ![A chat where models deliberate in sequence and collaborate on artifacts](docs/chat.png)
 
@@ -37,7 +37,7 @@ All versions and release notes: [Releases](https://github.com/Just-Me-Media/Free
 
 | Distribution | Best For | How to Run |
 | :--- | :--- | :--- |
-| **macOS Native App (`.dmg`)** | macOS users (Apple Silicon) wanting a native, zero-setup desktop app | Download the `.dmg` from [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases), drag to Applications, and launch |
+| **macOS Native App (`.dmg`)** | macOS users (Apple Silicon) wanting a native, zero-setup desktop app | Download the `.dmg` from [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases) |
 | **Windows Native App (`.exe`)** | Windows 11 users wanting a standalone, lightweight installer | Coming soon. Use the Web Server option below for now |
 | **Web Server (`Node.js`)** | Headless systems, servers, or local browsers | `npm start` (zero third-party dependencies) |
 
@@ -50,6 +50,7 @@ Requires [Node.js](https://nodejs.org) 18 or newer and a running FreeLLMAPI inst
 ```bash
 git clone https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable.git
 cd FreeLLMAPI-Roundtable
+npm install
 npm start
 ```
 
@@ -115,7 +116,13 @@ cargo tauri build
 
 ## Support
 
-Roundtable is free, open source (MIT), and built and maintained by one person. If it saves you time, you can [buy me a coffee](https://buymeacoffee.com/justmemedia) to help me keep building. Bug reports, ideas, and stars on GitHub help just as much.
+Roundtable is free, open source (MIT), and built and maintained by one person. If it saves you time, you can [buy me a coffee](https://buymeacoffee.com/justmemedia) to help me keep building.
+
+Need help, want to report a bug, or have a feature idea? Use one of these:
+
+- [Open a GitHub issue](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/issues)
+- [Start a GitHub discussion](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/discussions)
+- [Report a security issue privately](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/security/advisories/new)
 
 Roundtable is an unofficial companion to [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi). Support here goes to Roundtable, not to the FreeLLMAPI project.
 
@@ -124,4 +131,3 @@ Roundtable is an unofficial companion to [FreeLLMAPI](https://github.com/tashfee
 ## License
 
 [MIT](LICENSE) © Just Me Media. Unofficial companion project for FreeLLMAPI.
-
