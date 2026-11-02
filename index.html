@@ -1064,6 +1064,20 @@
 
       const QUICK = ['dots3', 'gpt-oss 120b|gpt-oss-120b', 'muse glimmer', 'north mini code|north-mini'];
 
+      // ---------- role templates ----------
+      const ROLE_TEMPLATES = [
+        { id: 'synthesizer', label: 'Synthesizer (extract code artifacts)', value: 'You are the synthesizer. Extract and consolidate all code artifacts, implementations, and technical solutions from the previous responses. Merge complementary approaches and identify the best patterns.' },
+        { id: 'outline', label: 'Draft initial outline', value: 'You are responsible for drafting the initial high-level outline and structure. Identify key components and logical flow before detailed implementation.' },
+        { id: 'critique', label: 'Critique and find flaws', value: 'You are the critical reviewer. Identify weaknesses, potential bugs, edge cases, and logical flaws in the proposals. Be thorough and constructive in your critique.' },
+        { id: 'brainstorm', label: 'Brainstorm ideas', value: 'You are the creative brainstormer. Generate multiple diverse approaches, alternative solutions, and novel ideas without worrying about implementation details.' },
+        { id: 'summarize', label: 'Summarize key points', value: 'You are the summarizer. Distill the discussion into clear, concise summaries of key decisions, action items, and critical insights.' },
+        { id: 'factcheck', label: 'Fact checker', value: 'You are the fact checker. Verify claims, check for accuracy, and ensure all statements are grounded in reality and technical feasibility.' },
+        { id: 'experiment', label: 'Experiment with approaches', value: 'You are the experimenter. Try different approaches, explore edge cases, and test assumptions with practical examples.' },
+        { id: 'user-focus', label: 'Focus on user needs', value: 'You are the user advocate. Ensure all solutions prioritize user experience, accessibility, and real-world usability. Challenge technical complexity that doesn\'t serve users.' },
+        { id: 'analyze', label: 'Analyze data patterns', value: 'You are the data analyst. Identify patterns, trends, and correlations in the responses. Find connections and synthesize insights from multiple viewpoints.' },
+        { id: 'devils-advocate', label: 'Devils advocate', value: 'You are the devil\'s advocate. Challenge assumptions, question consensus, and explore counter-arguments to ensure robust decision-making.' },
+      ];
+
       // ---------- state ----------
       const S = {
         cfg: {
@@ -1114,6 +1128,10 @@
         if (window.location.origin.includes(':5173')) {
           return '';
         }
+        // Tauri desktop: use local proxy server
+        if (window.__TAURI__) {
+          return 'http://localhost:5173';
+        }
         // If user provided a specific URL in Setup
         if (S.cfg.freellmUrl && S.cfg.freellmUrl.trim()) {
           return S.cfg.freellmUrl.trim().replace(/\/+$/, '');
@@ -1122,7 +1140,7 @@
         const candidates = ['http://127.0.0.1:31415', 'http://127.0.0.1:3001'];
         for (const c of candidates) {
           try {
-            const r = await fetch(c + '/api/ping', { signal: AbortSignal.timeout(800) });
+            const r = await fetch(c + '/api/ping');
             if (r.ok || r.status) {
               S.cfg.freellmUrl = c;
               if ($('freellmUrl')) $('freellmUrl').value = c;
@@ -1174,19 +1192,27 @@
       // ---------- status ----------
       async function checkHealth() {
         try {
+          console.log('[checkHealth] Starting health check...');
+          console.log('[checkHealth] Location:', window.location.origin);
+          console.log('[checkHealth] Has Tauri:', !!window.__TAURI__);
+          
           if (window.location.origin.includes(':5173')) {
+            console.log('[checkHealth] Using proxy health check');
             const r = await fetch('/health');
+            console.log('[checkHealth] Fetch response:', r.status, r.statusText);
             const j = await r.json();
+            console.log('[checkHealth] Health data:', j);
             if (j.upstream) {
               $('dot').className = 'dot ok';
               $('status').textContent = 'FreeLLMAPI connected (' + j.target + ')';
               S.backendStatus = 'upstream';
+              console.log('[checkHealth] Success - backend connected');
               return;
             }
           }
           // Standalone app / Direct mode: probe base URL directly
           const base = await getApiBase();
-          const r = await fetch(base + '/api/ping', { signal: AbortSignal.timeout(1200) });
+          const r = await fetch(base + '/api/ping');
           if (r.ok || r.status) {
             $('dot').className = 'dot ok';
             $('status').textContent = 'FreeLLMAPI connected (' + base + ')';
@@ -1667,7 +1693,11 @@
           box.innerHTML = '<div class="note" style="margin-bottom:8px">No models added yet. Choose from Local or Cloud tabs above.</div>';
           return;
         }
-        box.innerHTML = S.cfg.slots.map((s, i) => `
+        box.innerHTML = S.cfg.slots.map((s, i) => {
+          const roleTemplateMatch = ROLE_TEMPLATES.find(t => s.role === t.value);
+          const selectedTemplate = roleTemplateMatch ? roleTemplateMatch.id : 'custom';
+          const isCustom = selectedTemplate === 'custom' && s.role;
+          return `
       <div class="slot" style="--tint:${tint(i)}" data-slot="${s.id}">
         <div class="top">
           <span class="num">${i + 1}</span>
@@ -1677,8 +1707,16 @@
           <button class="iconbtn" data-rm="${s.id}" title="Remove">✕</button>
         </div>
         <div class="mid">${esc(s.model)}</div>
-        <textarea class="t" data-field="role" placeholder="Optional role, e.g. 'Draft initial outline' or 'Critique and find flaws'">${esc(s.role)}</textarea>
-      </div>`).join('');
+        <div class="role-select-wrapper" style="margin-top:6px">
+          <select data-field="role-template" style="width:100%;margin-bottom:4px;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)">
+            <option value="">-- Select role template --</option>
+            ${ROLE_TEMPLATES.map(t => `<option value="${t.id}" ${selectedTemplate === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}
+            <option value="custom" ${isCustom ? 'selected' : ''}>Custom role...</option>
+          </select>
+          <textarea class="t" data-field="role" placeholder="Optional role, e.g. 'Draft initial outline' or 'Critique and find flaws'" style="${isCustom || selectedTemplate !== 'custom' ? '' : 'display:none'}">${esc(s.role)}</textarea>
+        </div>
+      </div>`;
+        }).join('');
       }
 
       function renderModelList() {
@@ -1702,7 +1740,7 @@
 
         // Probe Ollama
         try {
-          const r = await fetch('http://127.0.0.1:11434/api/tags', { signal: AbortSignal.timeout(2000) });
+          const r = await fetch('http://127.0.0.1:11434/api/tags');
           if (r.ok) {
             const j = await r.json();
             for (const m of (j.models || [])) {
@@ -1713,7 +1751,7 @@
 
         // Probe LM-Studio
         try {
-          const r = await fetch('http://127.0.0.1:1234/v1/models', { signal: AbortSignal.timeout(2000) });
+          const r = await fetch('http://127.0.0.1:1234/v1/models');
           if (r.ok) {
             const j = await r.json();
             for (const m of (j.data || [])) {
@@ -2012,7 +2050,24 @@
       $('slots').addEventListener('input', e => {
         const f = e.target.dataset.field; if (!f) return;
         const slot = S.cfg.slots.find(x => x.id === e.target.closest('[data-slot]').dataset.slot);
-        if (slot) { slot[f] = e.target.value; renderLineup(); save(); }
+        if (!slot) return;
+        
+        if (f === 'role-template') {
+          const template = ROLE_TEMPLATES.find(t => t.id === e.target.value);
+          if (template) {
+            slot.role = template.value;
+          } else if (e.target.value === 'custom') {
+            // Switch to custom mode, clear role to force user to type
+            slot.role = '';
+          } else {
+            slot.role = '';
+          }
+          renderSlots();
+        } else {
+          slot[f] = e.target.value;
+          renderLineup();
+        }
+        save();
       });
 
       $('key').addEventListener('input', () => { S.cfg.key = $('key').value.trim(); save(); });
@@ -2073,6 +2128,10 @@
       const block = (match[2] || '').trim();
       if (block && (ARTIFACT_LANGS.has(lang) || !lang)) last = { lang: lang || 'markdown', text: block };
     }
+    // Fallback: if model is a synthesizer and produced substantial text without code fences, treat whole response as markdown artifact
+    if (!last && text && text.trim().length > 50) {
+      last = { lang: 'markdown', text: text.trim() };
+    }
     return last;
   }
 
@@ -2131,7 +2190,7 @@
 
   function renderArtifact(entry) {
     const el = $('artifactRenderArea');
-    if (!entry) { el.innerHTML = '<div style="color:var(--muted);font-style:italic;padding:20px;text-align:center">Waiting for synthesizer artifact…<br><small>Set a model's role to include "synthesizer" in Setup</small></div>'; return; }
+    if (!entry) { el.innerHTML = '<div style="color:var(--muted);font-style:italic;padding:20px;text-align:center">Waiting for synthesizer artifact…<br><small>Set a model&apos;s role to include "synthesizer" in Setup</small></div>'; return; }
     if (artifactDiffOpen) { el.style.display = 'none'; return; }
     el.style.display = '';
     if (entry.lang === 'markdown' || entry.lang === 'md') {
