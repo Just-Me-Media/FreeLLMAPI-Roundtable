@@ -25,7 +25,7 @@ Pick who sits at the table, set their order, and let models build on each other'
 
 | Distribution | Best For | How to Run |
 | :--- | :--- | :--- |
-| **macOS Native App (`.dmg`)** | macOS users (Apple Silicon & Intel) wanting a native, zero-setup desktop app | Download `Roundtable.dmg`, drag to Applications, and launch |
+| **macOS Native App (`.dmg`)** | macOS users (Apple Silicon) wanting a native, zero-setup desktop app | Download the `.dmg` from [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases), drag to Applications, and launch |
 | **Windows Native App (`.exe`)** | Windows 11 users wanting a standalone, lightweight installer | Coming soon. Use the Web Server option below for now |
 | **Web Server (`Node.js`)** | Headless systems, servers, or local browsers | `npm start` (zero third-party dependencies) |
 
