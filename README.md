@@ -21,6 +21,18 @@ Pick who sits at the table, set their order, and let models build on each other'
 
 ---
 
+## Download
+
+| Platform | Download |
+|:---------|:---------|
+| **macOS** (Apple Silicon, signed and notarized) | [Roundtable-macOS-AppleSilicon.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/latest/download/Roundtable-macOS-AppleSilicon.dmg) |
+| **Windows 11** | Coming soon. Watch [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases) |
+| **Web server** (any OS with Node.js 18+) | See [Quick Start](#quick-start-web-server) |
+
+All versions and release notes: [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases)
+
+* * *
+
 ## Choose Your Setup
 
 | Distribution | Best For | How to Run |
