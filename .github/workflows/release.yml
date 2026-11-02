@@ -1,9 +1,6 @@
 name: Release Desktop Apps
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -27,5 +24,4 @@ jobs:
           releaseBody: 'Roundtable desktop application release.'
           releaseDraft: false
           prerelease: false
-
 
