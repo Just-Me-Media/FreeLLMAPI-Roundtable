@@ -7,34 +7,16 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-tauri:
+  build-windows:
+    name: Build Windows on ThinkCentre
+    runs-on: [self-hosted, Windows]
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-          - platform: 'windows-latest'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
-
-      - name: Build Tauri App
+      - name: Build Tauri App (Windows)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,8 +24,8 @@ jobs:
           projectPath: './roundtable'
           tagName: v__VERSION__
           releaseName: 'Roundtable v__VERSION__'
-          releaseBody: 'See the assets to download Roundtable for macOS (.dmg) and Windows (.exe).'
-          releaseDraft: true
+          releaseBody: 'Roundtable desktop application release.'
+          releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+
 
