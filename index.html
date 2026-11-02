@@ -1946,14 +1946,27 @@
       $('btnClose').onclick = closeSetup;
       $('overlay').addEventListener('mousedown', e => { if (e.target.id === 'overlay') closeSetup(); });
       $('btnExport').onclick = exportMd;
-      $('btnClear').onclick = () => {
+      $('btnClear').onclick = async () => {
         if (S.running) return;
-        if (!S.msgs.length || confirm('Start a new chat? Current conversation will be cleared.')) {
-          S.msgs = [];
-          S.activeChatId = null;
-          renderChat();
-          save();
+        if (S.msgs.length) {
+          const saveFirst = await modalConfirm(
+            'Save Current Chat?',
+            'You have an active conversation. Would you like to save it to your saved chats before starting a new one?'
+          );
+          if (saveFirst) {
+            saveCurrentChat();
+          } else {
+            const discard = await modalConfirm(
+              'Discard Chat?',
+              'Are you sure you want to start a new chat without saving? All current messages will be cleared.'
+            );
+            if (!discard) return;
+          }
         }
+        S.msgs = [];
+        S.activeChatId = null;
+        renderChat();
+        save();
       };
 
       if ($('btnDetectLocal')) $('btnDetectLocal').onclick = detectLocalModels;
