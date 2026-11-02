@@ -1,103 +1,107 @@
 # Roundtable for FreeLLMAPI
 
-**A shared group chat for the models behind your [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi).** Pick who sits at the table and in what order they answer, once. After that, every model sees the whole conversation, including what the other models said.
+**A collaborative group chat UI for your local and cloud LLMs via [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi), Ollama, and LM-Studio.**
 
-![A chat where three models answer in order and build on each other](docs/chat.png)
+Pick who sits at the table, set their order, and let models build on each other's work in real-time. Deliberation happens in one shared thread with streaming responses, live artifact generation, diff tracking, and automatic fallback.
 
-*Screenshots use a mock backend with canned replies, so the text is illustrative.*
+![A chat where models deliberate in sequence and collaborate on artifacts](docs/chat.png)
 
-## Why
+---
 
-Most multi-model UIs send the same prompt to several models and show the answers side by side. Each model answers alone and never sees the others. Roundtable puts them all in one thread: the first model drafts, the second critiques, the third summarizes, and on the next turn they can all respond to each other.
+## Key Features
 
-FreeLLMAPI already gives you one OpenAI-compatible endpoint for many free providers. Roundtable is a small front end for that endpoint.
+- **Sequential & Collaborative Deliberation**: Models see peer replies in order (`Model 1 drafts` → `Model 2 critiques` → `Model 3 synthesizes`).
+- **Live Artifact & Evolving Previews**: Models tagged with the `synthesizer` role produce documents, code, or web apps rendered live in a side panel (Markdown, HTML/CSS/JS sandbox, or code fences).
+- **In-Memory Version History & Diff**: Step back through revisions (`v1`, `v2`, ...) with an on-demand line differ (`🔀 Diff`).
+- **Local & Cloud Model Hybrid**: Auto-detects local Ollama (`:11434`) and LM-Studio (`:1234`) instances alongside your FreeLLMAPI cloud models.
+- **Quota & Cost Transparency**: Calculates exact `models × rounds` request volume before dispatching.
+- **Read-Only Consensus Gauge**: Real-time keyword overlap tracking (`🟢 High agreement`, `🟡 Partial agreement`, `🔴 Diverging`) to gauge convergence.
+- **Multimodal Ready**: Drag-and-drop, upload, or paste (`Cmd+V` / `Ctrl+V`) images directly into prompts for vision-enabled models.
+- **Privacy-First**: Zero tracking, 127.0.0.1-only local proxy, and optional session-only key storage.
 
-## Quick start
+---
 
-You need [Node.js](https://nodejs.org) 18 or newer and a running FreeLLMAPI with some provider keys added.
+## Choose Your Setup
+
+| Distribution | Best For | How to Run |
+| :--- | :--- | :--- |
+| **macOS Native App (`.dmg`)** | macOS users (Apple Silicon & Intel) wanting a native, zero-setup desktop app | Download `Roundtable.dmg`, drag to Applications, and launch |
+| **Windows Native App (`.exe`)** | Windows 11 users wanting a standalone, lightweight installer | Download `Roundtable-Setup.exe` from Releases and run |
+| **Web Server (`Node.js`)** | Headless systems, servers, or local browsers | `npm start` (zero third-party dependencies) |
+
+---
+
+## Quick Start (Web Server)
+
+Requires [Node.js](https://nodejs.org) 18 or newer and a running FreeLLMAPI instance or local engine (Ollama/LM-Studio).
 
 ```bash
-git clone https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable
+git clone https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable.git
 cd FreeLLMAPI-Roundtable
-node server.js        # or: npm start
+npm start
 ```
 
-Open <http://localhost:5173>. The first time, the Setup panel opens:
+Open <http://localhost:5173>. On initial launch, the **Setup** drawer opens:
 
-1. Paste your FreeLLMAPI **unified key** (it starts with `freellmapi-`) and click **Load models**.
-2. Click **Quick start**, or search and add models one by one. Use the arrows to set the **answer order**.
-3. Optionally give each model a **role**, such as "Draft the first answer" or "Write the final summary".
-4. Click **Done**. Setup is saved in your browser, so next time you just open the page.
+1. **Local Models**: Click **Detect Local Models** to scan local ports (`11434` / `1234`).
+2. **Cloud Models**: Enter your FreeLLMAPI unified key (`freellmapi-...`) or individual provider key and click **Load FreeLLMAPI Models**.
+3. **Table Lineup**: Organize your model order and optionally assign roles (e.g., `Drafting`, `Critique`, `Synthesizer`).
+4. Click **Done**. Settings persist locally in your browser.
 
-![The setup panel with three models, each with a role](docs/setup.png)
+---
 
-Roundtable looks for FreeLLMAPI on `http://127.0.0.1:3001` (Docker and `npm run dev`) and `http://127.0.0.1:31415` (desktop app), and uses whichever answers. The dot at the top turns green when it is connected.
+## How It Works
 
-## How it works
+Each participant receives an isolated, compliant view of the thread:
 
-Each model gets its own view of the thread:
+- **System Prompt**: Incorporates shared instructions, assigned roles, and the participant roster.
+- **Merged User Turns**: Models observe peer replies formatted as `[Model Name]: ...` while maintaining standard alternating user/assistant API schemas.
+- **Graceful Fallbacks**: If a provider rate-limits (429) or experiences downtime, Roundtable automatically re-routes via your designated fallback model with full provenance tagging.
+- **Session History**: Save, search, and recall past conversations with the built-in **Saved Chats** drawer.
 
-- A **system prompt** with your shared instructions, the model's name and role, and the list of participants.
-- Its **own earlier replies** as `assistant` messages.
-- Everyone else's replies as `user` messages tagged with the author, like `[Dots3 Note Preview]: ...`. Consecutive user turns are merged, so providers that insist on strictly alternating roles still accept the request.
-
-Around that:
-
-- **Rounds per message** (1 to 3). With 2 or more, the models answer, then react to each other.
-- **Another round** runs one more pass with no new message from you.
-- **Fallback.** If a model errors (rate limit, outage), Roundtable retries once with a model of your choice, `auto` by default. The reply is marked "via auto", and error text never enters the shared history.
-- **Stop** cancels the current run and the upstream request. **Retry this model** appears on any failed reply.
-- Replies stream in. Chats and setup persist across reloads. **Export** saves the chat as Markdown.
-
-## Watch your free quotas
-
-One message costs **models × rounds** requests. Five models and two rounds is ten requests per message, and the app shows that number under the input box. Some free tiers are small (for example, around 20 requests a day on some Gemini models), so put those models last, use fewer rounds, or leave them out.
+---
 
 ## Configuration
 
-| Variable | Default | What it does |
+| Variable | Default | Description |
 | --- | --- | --- |
-| `PORT` | `5173` | Port Roundtable listens on |
-| `FREELLMAPI_URL` | auto-detect `:3001`, then `:31415` | Where FreeLLMAPI lives, for example `http://192.168.1.20:3001` |
-| `FREELLMAPI_KEY` | none | Unified key to use when the browser sends none |
+| `PORT` | `5173` | Local HTTP port |
+| `FREELLMAPI_URL` | Auto-detected (`:31415` or `:3001`) | Upstream FreeLLMAPI gateway endpoint |
+| `FREELLMAPI_KEY` | None | Optional environment-level default key |
 
 ```bash
-FREELLMAPI_URL=http://192.168.1.20:3001 PORT=8080 node server.js
+FREELLMAPI_URL=http://127.0.0.1:31415 PORT=5173 npm start
 ```
 
-Roundtable talks to a plain OpenAI-compatible `/v1` API (`GET /v1/models` and streamed `POST /v1/chat/completions`), so it may work with other gateways too. It has only been tested against FreeLLMAPI and a mock.
+---
 
-## Security notes
+## Building Desktop Apps Locally
 
-- The server listens on **127.0.0.1 only**. Don't expose it to a network: the page holds your unified key.
-- The key is saved in your browser's `localStorage` on this machine, and it is sent to FreeLLMAPI through the local proxy. Anyone with access to your browser profile can read it.
-- Everything you type goes to whichever providers your FreeLLMAPI routes to. Don't put anything in a chat that you wouldn't send to those providers.
-
-## Troubleshooting
-
-| You see | Likely cause |
-| --- | --- |
-| Red dot, "FreeLLMAPI is not running" | FreeLLMAPI isn't running, or it uses another port. Set `FREELLMAPI_URL`. |
-| "Cannot reach FreeLLMAPI ... ECONNREFUSED" | Same as above. The desktop app, Docker and dev mode use different ports. |
-| `Invalid API key` when loading models | Use the **unified** `freellmapi-...` key from the Keys page, not a provider key or the dashboard admin key. |
-| One model errors with 429 | That provider hit its free limit. Move it down, drop a round, or rely on the fallback. |
-| A model passes in other tools but fails here | The model ID in Setup must match `GET /v1/models` exactly. |
-
-## Development
-
+### macOS (.dmg)
+Requires Rust and the Tauri CLI:
 ```bash
-npm install
-npx playwright install chromium
-npm test                 # runs the page in Chromium against a mock FreeLLMAPI
-npm run screenshots      # regenerates docs/*.png
+npm run build:mac
+# Or to build, sign, and notarize:
+./scripts/build-and-notarize.sh
 ```
 
-The tests start a mock FreeLLMAPI on port 41415 and Roundtable on 5199, so they never touch a real FreeLLMAPI or your own Roundtable. They check answer order, what each model receives, the fallback, rounds, persistence and Stop. The mock only covers the endpoints Roundtable uses, so if a real FreeLLMAPI build behaves differently, please open an issue.
+### Windows (.exe)
+Built natively via your Windows build machine (or ThinkCentre runner):
+```powershell
+cargo tauri build
+```
 
-The app is one `index.html` with no build step and no dependencies, plus a dependency-free `server.js`.
+---
 
-## About
+## Security & Privacy
 
-This is an unofficial companion project. It is not affiliated with or endorsed by FreeLLMAPI. It was built with the help of Claude (Anthropic).
+- The local proxy binds strictly to `127.0.0.1`.
+- API credentials are stored only on the client side (in-memory by default, or opt-in `localStorage`).
+- Zero telemetries, external analytics, or remote logging.
 
-[MIT licensed](LICENSE).
+---
+
+## License
+
+[MIT](LICENSE) © Just Me Media. Unofficial companion project for FreeLLMAPI.
+
