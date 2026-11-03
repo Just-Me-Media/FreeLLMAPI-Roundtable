@@ -1066,7 +1066,7 @@
 
       // ---------- role templates ----------
       const ROLE_TEMPLATES = [
-        { id: 'synthesizer', label: 'Synthesizer (extract code artifacts)', value: 'You are the synthesizer. Extract and consolidate all code artifacts, implementations, and technical solutions from the previous responses. Merge complementary approaches and identify the best patterns.' },
+        { id: 'synthesizer', label: 'Synthesizer (extract code artifacts)', value: 'You are the synthesizer. Your task is to synthesize the previous responses into a final implementation. Output MUST be in code blocks with proper language identifiers (```javascript, ```python, etc.). Extract the best ideas from earlier models, merge them into coherent code, and present the final artifact as a fenced code block.' },
         { id: 'outline', label: 'Draft initial outline', value: 'You are responsible for drafting the initial high-level outline and structure. Identify key components and logical flow before detailed implementation.' },
         { id: 'critique', label: 'Critique and find flaws', value: 'You are the critical reviewer. Identify weaknesses, potential bugs, edge cases, and logical flaws in the proposals. Be thorough and constructive in your critique.' },
         { id: 'brainstorm', label: 'Brainstorm ideas', value: 'You are the creative brainstormer. Generate multiple diverse approaches, alternative solutions, and novel ideas without worrying about implementation details.' },
@@ -1123,14 +1123,15 @@
       };
 
       // ---------- API URL resolution ----------
+      const isTauri = () => !!(window.__TAURI__ || window.__TAURI_INTERNALS__ || location.protocol === 'tauri:' || location.hostname === 'tauri.localhost');
       async function getApiBase() {
         // If running in browser under server.js proxy on port 5173
         if (window.location.origin.includes(':5173')) {
           return '';
         }
         // Tauri desktop: use local proxy server
-        if (window.__TAURI__) {
-          return 'http://localhost:5173';
+        if (isTauri()) {
+          return 'http://127.0.0.1:5173';
         }
         // If user provided a specific URL in Setup
         if (S.cfg.freellmUrl && S.cfg.freellmUrl.trim()) {
@@ -1196,9 +1197,10 @@
           console.log('[checkHealth] Location:', window.location.origin);
           console.log('[checkHealth] Has Tauri:', !!window.__TAURI__);
           
-          if (window.location.origin.includes(':5173')) {
+          const viaProxy = window.location.origin.includes(':5173');
+          if (viaProxy || isTauri()) {
             console.log('[checkHealth] Using proxy health check');
-            const r = await fetch('/health');
+            const r = await fetch((viaProxy ? '' : 'http://127.0.0.1:5173') + '/health');
             console.log('[checkHealth] Fetch response:', r.status, r.statusText);
             const j = await r.json();
             console.log('[checkHealth] Health data:', j);
@@ -2129,6 +2131,7 @@
       if (block && (ARTIFACT_LANGS.has(lang) || !lang)) last = { lang: lang || 'markdown', text: block };
     }
     // Fallback: if model is a synthesizer and produced substantial text without code fences, treat whole response as markdown artifact
+    // Note: Synthesizer should ALWAYS output code blocks. If it doesn't, we still capture the text as markdown fallback.
     if (!last && text && text.trim().length > 50) {
       last = { lang: 'markdown', text: text.trim() };
     }

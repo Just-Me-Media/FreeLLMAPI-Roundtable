@@ -4,7 +4,7 @@
 
 **Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable
 
-**Purpose:** Build and test Windows desktop installer (MSI / NSIS) for Roundtable. Mac/Linux builds handled on M1 Pro.
+**Purpose:** Build and test the Windows desktop installer (MSI / NSIS) for Roundtable, which brings local, cloud, and FreeLLMAPI models into one role-based shared conversation. macOS builds are handled on the M1 Pro.
 
 **Status:** In progress — local build running (`cargo tauri build`).
 
@@ -46,6 +46,29 @@
 - CRLF vs LF: repo uses LF, Windows build works fine.
 - ExecutionPolicy bypass required for `build-windows.ps1` (`powershell -ExecutionPolicy Bypass -File .\build-windows.ps1`).
 - `beforeBuildCommand` removed from Windows config to avoid `mkdir -p` / `cp` POSIX failures.
+
+## Server Recovery & User Self-Service
+
+### Restarting Server After Crash/Interruption
+Chat history persists in browser localStorage, so users won't lose conversations even if the server restarts. To restore server access:
+
+**Quick Restart:**
+1. Double-click `Restart-Server.bat` in the project root
+2. Server will restart on port 5173
+3. Refresh browser at http://localhost:5173
+
+**Check Status:**
+- Run `Check-Server.bat` to verify server is listening
+
+**Auto-Recovery:**
+- Run `server-monitor.bat` to keep server running automatically
+- Monitors port 5173 every 30 seconds and restarts if needed
+
+**Files:**
+- `Restart-Server.bat` - One-click server restart
+- `Check-Server.bat` - Status check
+- `server-monitor.bat` - Auto-recovery monitor
+- `Roundtable-Start.bat` - Full launch (server + Tauri app)
 
 ## Links
 - CROSS_MACHINE_SYNC.md — sync protocol for Mac/Windows
