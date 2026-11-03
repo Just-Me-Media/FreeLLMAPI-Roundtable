@@ -26,6 +26,7 @@ const check = (cond, msg) => {
     check(await page.locator('#overlay.open').count() === 1, 'setup opens on first run');
 
     // Bad key surfaces the upstream error; good key loads models
+    await page.click('[data-tab="tab-cloud"]');
     await page.fill('#key', 'wrong');
     await page.click('#btnLoad');
     await page.waitForFunction(() => document.getElementById('loadNote').textContent.startsWith('Failed'));
@@ -44,9 +45,10 @@ const check = (cond, msg) => {
     await page.locator('[data-up]').nth(4).click();
     names = await page.$$eval('#slots input[data-field=name]', els => els.map(e => e.value));
     check(names[3] === 'Broken Model', 'reordering moves a model up: ' + names.join(' | '));
+    await page.locator('#slots select[data-field=role-template]').first().selectOption('custom');
     await page.locator('textarea[data-field=role]').first().fill('Draft the first answer.');
     await page.click('#btnClose');
-    check((await page.textContent('#roundHint')).includes('5 models × 1 round = 5 requests'), 'request-cost hint is shown');
+    check((await page.textContent('#roundHint')).includes('5 models × 1 round = 5 req/msg'), 'request-cost hint is shown');
 
     // One message, five models
     await page.fill('#input', 'What is 2+2?');

@@ -115,10 +115,27 @@ npm run build:mac
 ```
 
 ### Windows (.exe)
-Built natively via your Windows build machine (or ThinkCentre runner):
+Build locally on your Windows ThinkCentre:
 ```powershell
 cargo tauri build
 ```
+
+---
+
+## Tests and GitHub Actions
+
+Run the browser tests locally with:
+
+```bash
+npm ci
+npx playwright install chromium
+npm test
+npm run smoke
+```
+
+GitHub Actions runs these tests on an Ubuntu runner for pushes and pull requests. It does not build desktop packages. macOS and Windows packages are built locally on the M1 Pro and Windows ThinkCentre, respectively.
+
+The separate **Release Desktop Apps** workflow is disabled on GitHub to avoid unexpected builds; pushing a version tag does not start a build.
 
 ---
 

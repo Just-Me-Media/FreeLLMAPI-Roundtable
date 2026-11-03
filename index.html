@@ -1112,6 +1112,10 @@
         set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } },
       };
 
+      const isUsingLocalProxy = () =>
+        window.location.protocol === 'http:' &&
+        ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
       const save = () => {
         store.set('rt.cfg', S.cfg);
         store.set('rt.msgs', S.msgs.filter(m => !m.pending));
@@ -1125,8 +1129,8 @@
       // ---------- API URL resolution ----------
       const isTauri = () => !!(window.__TAURI__ || window.__TAURI_INTERNALS__ || location.protocol === 'tauri:' || location.hostname === 'tauri.localhost');
       async function getApiBase() {
-        // If running in browser under server.js proxy on port 5173
-        if (window.location.origin.includes(':5173')) {
+        // The local server proxies API calls on the same origin, regardless of its configured port.
+        if (isUsingLocalProxy()) {
           return '';
         }
         // Tauri desktop: use local proxy server
@@ -1197,7 +1201,7 @@
           console.log('[checkHealth] Location:', window.location.origin);
           console.log('[checkHealth] Has Tauri:', !!window.__TAURI__);
           
-          const viaProxy = window.location.origin.includes(':5173');
+          const viaProxy = isUsingLocalProxy();
           if (viaProxy || isTauri()) {
             console.log('[checkHealth] Using proxy health check');
             const r = await fetch((viaProxy ? '' : 'http://127.0.0.1:5173') + '/health');
@@ -1698,7 +1702,7 @@
         box.innerHTML = S.cfg.slots.map((s, i) => {
           const roleTemplateMatch = ROLE_TEMPLATES.find(t => s.role === t.value);
           const selectedTemplate = roleTemplateMatch ? roleTemplateMatch.id : 'custom';
-          const isCustom = selectedTemplate === 'custom' && s.role;
+          const isCustom = selectedTemplate === 'custom';
           return `
       <div class="slot" style="--tint:${tint(i)}" data-slot="${s.id}">
         <div class="top">
@@ -2130,23 +2134,44 @@
   // ========== ARTIFACT SYSTEM ==========
   const SYNTH_ROLE_KEYWORD = 'synthesizer';
   const ARTIFACT_LANGS = new Set(['markdown','md','html','js','css','ts','json','svg']);
+  const MAX_ARTIFACT_HISTORY = 20;
   let artifactHistory = [];
   let artifactCurrentIdx = -1;
   let artifactDiffOpen = false;
 
+  function normalizeArtifactText(value) {
+    if (typeof value !== 'string') return '';
+    return value.replace(/^```[\w-]*\s*/g, '').replace(/\n```\s*$/g, '').trim();
+  }
+
+  function restoreArtifactHistory(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter(entry => entry && typeof entry === 'object' && typeof entry.text === 'string')
+      .map(entry => ({
+        ts: Number.isFinite(entry.ts) ? entry.ts : Date.now(),
+        lang: typeof entry.lang === 'string' ? entry.lang.toLowerCase() : '',
+        text: normalizeArtifactText(entry.text)
+      }))
+      .filter(entry => ARTIFACT_LANGS.has(entry.lang) && entry.text)
+      .slice(-MAX_ARTIFACT_HISTORY);
+  }
+
   function extractArtifactFromText(text, roleName) {
     if (!roleName || !roleName.toLowerCase().includes(SYNTH_ROLE_KEYWORD)) return null;
+    const safeText = String(text || '').trim();
+    if (!safeText) return null;
     const fenceRe = /```(\w*)\n?([\s\S]*?)```/g;
     let last = null, match;
-    while ((match = fenceRe.exec(text)) !== null) {
+    while ((match = fenceRe.exec(safeText)) !== null) {
       const lang = (match[1] || '').toLowerCase();
-      const block = (match[2] || '').trim();
+      const block = normalizeArtifactText(match[2] || '');
       if (block && (ARTIFACT_LANGS.has(lang) || !lang)) last = { lang: lang || 'markdown', text: block };
     }
-    // Fallback: if model is a synthesizer and produced substantial text without code fences, treat whole response as markdown artifact
-    // Note: Synthesizer should ALWAYS output code blocks. If it doesn't, we still capture the text as markdown fallback.
-    if (!last && text && text.trim().length > 50) {
-      last = { lang: 'markdown', text: text.trim() };
+    // Ignore short fragments when the synthesizer did not provide a fenced artifact.
+    if (!last && safeText.length > 50) {
+      const normalized = normalizeArtifactText(safeText);
+      if (normalized.length > 20) last = { lang: 'markdown', text: normalized };
     }
     return last;
   }
@@ -2212,8 +2237,12 @@
     if (entry.lang === 'markdown' || entry.lang === 'md') {
       el.innerHTML = `<div style="font-size:13px;line-height:1.6">${renderArtifactMarkdown(entry.text)}</div>`;
     } else if (entry.lang === 'html') {
-      const enc = entry.text.replace(/"/g, '&quot;');
-      el.innerHTML = `<iframe srcdoc="${enc}" sandbox="allow-scripts" style="width:100%;height:300px;border:1px solid var(--line);border-radius:6px"></iframe>`;
+      const enc = entry.text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+      el.innerHTML = `<iframe srcdoc="${enc}" sandbox="" style="width:100%;height:300px;border:1px solid var(--line);border-radius:6px"></iframe>`;
     } else {
       el.innerHTML = `<pre style="margin:0;font-size:12px;white-space:pre-wrap;word-break:break-word;line-height:1.5">${esc(entry.text)}</pre>`;
     }
@@ -2243,6 +2272,7 @@
 
   function computeLineDiff(oldText, newText) {
     const a = oldText.split('\n'), b = newText.split('\n'), m = a.length, n = b.length;
+    if (m * n > 250000) return null;
     const dp = Array.from({length:m+1},()=>new Array(n+1).fill(0));
     for (let i=m-1;i>=0;i--) for (let j=n-1;j>=0;j--)
       dp[i][j] = a[i]===b[j] ? (dp[i+1][j+1]||0)+1 : Math.max(dp[i+1]?.[j]||0, dp[i]?.[j+1]||0);
@@ -2259,6 +2289,11 @@
     const overlay=$('artifactDiffOverlay'), renderArea=$('artifactRenderArea');
     if (!artifactDiffOpen||artifactCurrentIdx<1) { overlay.style.display='none'; renderArea.style.display=''; return; }
     const ops = computeLineDiff(artifactHistory[artifactCurrentIdx-1].text, artifactHistory[artifactCurrentIdx].text);
+    if (!ops) {
+      overlay.textContent = 'Diff unavailable for artifacts with more than 250,000 line comparisons.';
+      overlay.style.display='block'; renderArea.style.display='none';
+      return;
+    }
     overlay.innerHTML = ops.map(op => {
       const bg=op.t==='+'?'background:#d4edda;color:#155724':op.t==='-'?'background:#f8d7da;color:#721c24':'';
       return `<div style="${bg};padding:1px 6px;white-space:pre-wrap">${op.t==='+'?'+ ':op.t==='-'?'- ':'  '}${esc(op.l)}</div>`;
@@ -2267,9 +2302,12 @@
   }
 
   function pushArtifact(lang, text) {
+    const clean = normalizeArtifactText(String(text || ''));
+    if (!ARTIFACT_LANGS.has(lang) || !clean) return;
     const last = artifactHistory[artifactHistory.length-1];
-    if (last && last.text === text) return;
-    artifactHistory.push({ts:Date.now(), lang, text});
+    if (last && last.text === clean) return;
+    artifactHistory.push({ts:Date.now(), lang, text: clean});
+    if (artifactHistory.length > MAX_ARTIFACT_HISTORY) artifactHistory = artifactHistory.slice(-MAX_ARTIFACT_HISTORY);
     artifactCurrentIdx = artifactHistory.length - 1;
     artifactDiffOpen = false;
     refreshArtifactPane();
@@ -2301,8 +2339,10 @@
   $('btnToggleDiff').onclick = () => { if (artifactHistory.length<2) return; artifactDiffOpen=!artifactDiffOpen; showArtifactDiff(); refreshArtifactPane(); };
   $('btnCopyArtifact').onclick = () => {
     if (artifactCurrentIdx<0) return;
-    navigator.clipboard.writeText(artifactHistory[artifactCurrentIdx].text).catch(()=>{});
-    const b=$('btnCopyArtifact'); b.textContent='\u2705 Copied!'; setTimeout(()=>b.textContent='\uD83D\uDCCB Copy',1500);
+    if (!navigator.clipboard?.writeText) { alert('Clipboard access is unavailable in this browser context.'); return; }
+    navigator.clipboard.writeText(artifactHistory[artifactCurrentIdx].text).then(() => {
+      const b=$('btnCopyArtifact'); b.textContent='\u2705 Copied!'; setTimeout(()=>b.textContent='\uD83D\uDCCB Copy',1500);
+    }).catch(e => alert('Could not copy artifact: ' + e.message));
   };
   $('btnDownloadArtifact').onclick = () => {
     if (artifactCurrentIdx<0) return;
@@ -2358,7 +2398,10 @@
   // Restore saved artifact history
   try {
     const savedAH = localStorage.getItem('rt.artifactHistory');
-    if (savedAH) { const ah=JSON.parse(savedAH); if (Array.isArray(ah)&&ah.length) { artifactHistory=ah; artifactCurrentIdx=ah.length-1; } }
+    if (savedAH) {
+      artifactHistory = restoreArtifactHistory(JSON.parse(savedAH));
+      artifactCurrentIdx = artifactHistory.length - 1;
+    }
   } catch(e) {}
 
   refreshArtifactPane();

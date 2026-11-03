@@ -9,8 +9,13 @@
     "build:mac": "cargo tauri build",
     "build:dmg": "./scripts/build-and-notarize.sh",
     "test": "node test/e2e.js",
+    "smoke": "node test/smoke.js",
     "screenshots": "node test/screenshots.js"
   },
-  "engines": { "node": ">=18" },
-  "devDependencies": { "playwright": "^1.49.0" }
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "playwright": "1.57.0"
+  }
 }
