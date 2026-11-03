@@ -1,6 +1,6 @@
 {
   "name": "freellmapi-roundtable",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Bring local, cloud, and FreeLLMAPI models into one role-based shared conversation.",
   "private": true,
   "license": "MIT",
