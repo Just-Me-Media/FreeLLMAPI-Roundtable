@@ -655,7 +655,7 @@
     }
 
     .field textarea.t {
-      min-height: 64px;
+      min-height: 120px;
       resize: vertical;
     }
 
@@ -926,13 +926,13 @@
       <div class="banner" id="setupBanner" style="display:none"></div>
 
       <div class="tabs">
-        <button class="tab-btn active" data-tab="tab-local">🏠 Local Models</button>
+        <button class="tab-btn" data-tab="tab-local">🏠 Local Models</button>
         <button class="tab-btn" data-tab="tab-cloud">☁️ Cloud & FreeLLMAPI</button>
-        <button class="tab-btn" data-tab="tab-rules">⚙️ Turn Rules</button>
+        <button class="tab-btn active" data-tab="tab-rules">⚙️ Turn Rules</button>
       </div>
 
       <!-- LOCAL MODELS TAB -->
-      <div class="tab-body active" id="tab-local">
+      <div class="tab-body" id="tab-local">
         <p class="hint" style="margin:4px 0 10px">Find models running locally on your Mac or Windows PC (Ollama on
           11434, LM-Studio on 1234).</p>
         <div class="row" style="display:flex;gap:8px;margin-bottom:10px;">
@@ -974,6 +974,9 @@
           <button class="btn primary" id="btnLoad">Load FreeLLMAPI Models</button>
           <span class="note" id="loadNote" style="align-self:center"></span>
         </div>
+        <div class="row" style="display:flex;gap:8px;margin:6px 0 12px">
+          <button class="btn" id="btnValidate">Validate Lineup Models</button>
+        </div>
 
         <div class="field">
           <label for="directKey">Direct Provider Key (OpenRouter, Groq, etc.)</label>
@@ -996,7 +999,7 @@
       </div>
 
       <!-- TURN RULES TAB -->
-      <div class="tab-body" id="tab-rules">
+      <div class="tab-body active" id="tab-rules">
         <div class="field">
           <label for="rounds">Rounds per message</label>
           <select id="rounds">
@@ -1715,7 +1718,7 @@
             ${ROLE_TEMPLATES.map(t => `<option value="${t.id}" ${selectedTemplate === t.id ? 'selected' : ''}>${esc(t.label)}</option>`).join('')}
             <option value="custom" ${isCustom ? 'selected' : ''}>Custom role...</option>
           </select>
-          <textarea class="t" data-field="role" placeholder="Optional role, e.g. 'Draft initial outline' or 'Critique and find flaws'" style="${isCustom || selectedTemplate !== 'custom' ? '' : 'display:none'}">${esc(s.role)}</textarea>
+          <textarea class="t" data-field="role" placeholder="Optional role, e.g. 'Draft initial outline' or 'Critique and find flaws'">${esc(s.role)}</textarea>
         </div>
       </div>`;
         }).join('');
@@ -1820,6 +1823,58 @@
         } catch (e) {
           note.textContent = 'Failed: ' + e.message;
         }
+      }
+
+      async function validateLineupModels() {
+        const note = $('loadNote');
+        if (!S.cfg.slots.length) { note.textContent = 'No models in lineup to validate.'; return; }
+        note.textContent = 'Validating lineup…';
+        const base = await getApiBase();
+        if (base === undefined || base === null) { note.textContent = 'FreeLLMAPI base not reachable.'; return; }
+        const headers = { 'Content-Type':'application/json' };
+        if (S.cfg.key) headers.Authorization = 'Bearer ' + S.cfg.key;
+        const results = [];
+        for (const slot of S.cfg.slots) {
+          const modelId = slot.model;
+          try {
+            const url = base ? base + '/v1/chat/completions' : '/v1/chat/completions';
+            const r = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                model: modelId,
+                messages: [{ role:'user', content:'ping' }],
+                max_tokens: 1,
+                temperature: 0
+              })
+            });
+            if (r.status === 429) results.push({model:modelId, status:'rate_limit', detail:'429'});
+            else if (r.status === 401 || r.status === 403) results.push({model:modelId, status:'failed', detail:r.status+' auth'});
+            else if (r.ok) results.push({model:modelId, status:'passed', detail:'OK'});
+            else {
+              let msg = r.statusText;
+              try { const j = await r.json(); msg = j.error?.message || msg; } catch {}
+              results.push({model:modelId, status:'failed', detail:msg});
+            }
+          } catch (e) {
+            results.push({model:modelId, status:'failed', detail:e.message});
+          }
+          // small delay to avoid hammering
+          await new Promise(res => setTimeout(res, 200));
+        }
+        // store health
+        S.cfg.modelHealth = S.cfg.modelHealth || {};
+        for (const r of results) {
+          S.cfg.modelHealth[r.model] = { status:r.status, detail:r.detail, lastChecked: Date.now() };
+        }
+        save();
+        // show summary
+        const passed = results.filter(r=>r.status==='passed');
+        const rate = results.filter(r=>r.status==='rate_limit');
+        const failed = results.filter(r=>r.status==='failed');
+        note.textContent = `Validated ${results.length}: ✅ ${passed.length} passed, ⚠️ ${rate.length} rate-limited, ❌ ${failed.length} failed`;
+        console.table(results);
+        alert(`Validation complete:\nPassed: ${passed.map(r=>r.model).join(', ') || 'none'}\nRate-limited: ${rate.map(r=>r.model).join(', ') || 'none'}\nFailed: ${failed.map(r=>r.model).join(', ') || 'none'}`);
       }
 
       function quickStart() {
@@ -2000,6 +2055,7 @@
       };
 
       $('btnLoad').onclick = loadModels;
+      $('btnValidate').onclick = validateLineupModels;
       $('btnQuick').onclick = quickStart;
       $('search').oninput = renderModelList;
 
