@@ -2020,10 +2020,21 @@
             if (!discard) return;
           }
         }
+        // Preserve preview pane state
+        const prevPrompt = $('previewPrompt')?.textContent;
+        const prevStream = $('previewStream')?.textContent;
+        const prevArtifactIdx = artifactCurrentIdx;
+        
         S.msgs = [];
         S.activeChatId = null;
         renderChat();
         save();
+        
+        // Restore preview pane content
+        if ($('previewPrompt') && prevPrompt) $('previewPrompt').textContent = prevPrompt;
+        if ($('previewStream') && prevStream) $('previewStream').textContent = prevStream;
+        artifactCurrentIdx = prevArtifactIdx;
+        refreshArtifactPane();
       };
 
       if ($('btnDetectLocal')) $('btnDetectLocal').onclick = detectLocalModels;
@@ -2360,13 +2371,32 @@
     navigator.clipboard.writeText(artifactHistory[artifactCurrentIdx].text).catch(()=>{});
     const b=$('btnCopyArtifact'); b.textContent='\u2705 Copied!'; setTimeout(()=>b.textContent='\uD83D\uDCCB Copy',1500);
   };
-  $('btnDownloadArtifact').onclick = () => {
+  $('btnDownloadArtifact').onclick = async () => {
     if (artifactCurrentIdx<0) return;
     const {lang,text}=artifactHistory[artifactCurrentIdx];
     const ext=(lang==='markdown'||lang==='md')?'md':lang||'txt';
-    const name=prompt('Save artifact as:',`artifact.${ext}`)||`artifact.${ext}`;
-    const blob=new Blob([text],{type:'text/plain'}),a=document.createElement('a');
-    a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    const defaultName=`artifact.${ext}`;
+    const name=prompt('Save artifact as:',defaultName)||defaultName;
+    
+    if (isTauri() && window.__TAURI__?.dialog?.save) {
+      try {
+        const filePath = await window.__TAURI__.dialog.save({
+          defaultPath: name,
+          filters: [{ name: ext.toUpperCase(), extensions: [ext] }]
+        });
+        if (!filePath) return;
+        await window.__TAURI__.fs.writeFile(filePath, new TextEncoder().encode(text));
+        const b=$('btnDownloadArtifact'); b.textContent='✅ Saved'; setTimeout(()=>b.textContent='⬇️ Download',1500);
+      } catch(e) {
+        alert('Save failed: '+e.message);
+        // fallback to download
+        const blob=new Blob([text],{type:'text/plain'}),a=document.createElement('a');
+        a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+      }
+    } else {
+      const blob=new Blob([text],{type:'text/plain'}),a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    }
   };
   $('btnSaveArtifactHistory').onclick = () => {
     try { localStorage.setItem('rt.artifactHistory',JSON.stringify(artifactHistory)); const b=$('btnSaveArtifactHistory'); b.textContent='\u2705 Saved'; setTimeout(()=>b.textContent='\uD83D\uDCBE History',1500); }
