@@ -21,7 +21,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: './roundtable'
+          projectPath: './'
           tagName: v__VERSION__
           releaseName: 'Roundtable v__VERSION__'
           releaseBody: 'Roundtable desktop application release.'

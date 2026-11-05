@@ -865,6 +865,7 @@
     <div class="dot" id="dot"></div>
     <h1>Roundtable</h1>
     <span id="status">checking…</span>
+    <span id="buildStamp" style="font-size:0.65rem;opacity:0.4;margin-left:4px" title="Build timestamp">v2026-11-05T2030</span>
     <span class="spacer"></span>
     <button class="btn" id="btnTogglePreview" title="Toggle response preview pane">👁️ Preview</button>
     <button class="btn" id="btnSetup">⚙️ Setup</button>
@@ -1083,21 +1084,164 @@
   </div>
 
   <script>
-/* desktop-fetch-shim: in the desktop app, http(s) requests go through the native
-   HTTP plugin, so the WebView's CORS rules cannot block FreeLLMAPI, Ollama or
-   LM Studio. In a browser (npm start) window.__TAURI__ is absent: no change. */
-(function () {
-  if (!window.__TAURI__) return;
-  var webFetch = window.fetch.bind(window);
-  window.fetch = function (input, init) {
-    var T = window.__TAURI__;
-    var url = typeof input === 'string' ? input : (input && input.url) || String(input || '');
-    if (T && T.http && typeof T.http.fetch === 'function' && /^https?:\/\//i.test(url)) {
-      return T.http.fetch(input, init);
+// Official Tauri v2 HTTP Plugin Client & Global fetch Interceptor
+var __TAURI_PLUGIN_HTTP__ = (function() {
+  'use strict';
+  async function invokeTauri(cmd, args = {}, options) {
+    if (typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core && typeof window.__TAURI__.core.invoke === 'function') {
+      return window.__TAURI__.core.invoke(cmd, args, options);
     }
-    return webFetch(input, init);
+    if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__ && typeof window.__TAURI_INTERNALS__.invoke === 'function') {
+      return window.__TAURI_INTERNALS__.invoke(cmd, args, options);
+    }
+    throw new Error('Tauri IPC invoke not found');
+  }
+
+  const CANCEL_ERR = 'Request cancelled';
+
+  async function tauriFetch(input, init) {
+    const signal = init?.signal;
+    if (signal?.aborted) throw new Error(CANCEL_ERR);
+
+    const maxRedirections = init?.maxRedirections;
+    const connectTimeout = init?.connectTimeout;
+    const proxy = init?.proxy;
+    const danger = init?.danger;
+
+    const cleanInit = init ? { ...init } : {};
+    delete cleanInit.maxRedirections;
+    delete cleanInit.connectTimeout;
+    delete cleanInit.proxy;
+    delete cleanInit.danger;
+
+    const headersObj = cleanInit.headers
+      ? (cleanInit.headers instanceof Headers ? cleanInit.headers : new Headers(cleanInit.headers))
+      : new Headers();
+
+    const req = new Request(input, cleanInit);
+    const buf = await req.arrayBuffer();
+    const dataBytes = buf.byteLength !== 0 ? Array.from(new Uint8Array(buf)) : null;
+
+    for (const [k, v] of req.headers) {
+      if (!headersObj.get(k)) headersObj.set(k, v);
+    }
+
+    const headersList = (headersObj instanceof Headers
+      ? Array.from(headersObj.entries())
+      : Array.isArray(headersObj) ? headersObj : Object.entries(headersObj)
+    ).map(([k, v]) => [k, typeof v === 'string' ? v : String(v)]);
+
+    if (signal?.aborted) throw new Error(CANCEL_ERR);
+
+    const clientConfig = {
+      method: req.method,
+      url: req.url,
+      headers: headersList,
+      data: dataBytes
+    };
+    if (maxRedirections !== undefined) clientConfig.maxRedirections = maxRedirections;
+    if (connectTimeout !== undefined) clientConfig.connectTimeout = connectTimeout;
+    if (proxy !== undefined) clientConfig.proxy = proxy;
+    if (danger !== undefined && danger !== null && typeof danger === 'object') {
+      clientConfig.danger = danger;
+    }
+
+    const rid = await invokeTauri('plugin:http|fetch', { clientConfig });
+    const cancelReq = () => invokeTauri('plugin:http|fetch_cancel', { rid }).catch(() => {});
+
+    if (signal?.aborted) {
+      cancelReq();
+      throw new Error(CANCEL_ERR);
+    }
+    signal?.addEventListener('abort', () => { cancelReq(); });
+
+    const sendRes = await invokeTauri('plugin:http|fetch_send', { rid });
+    const status = sendRes.status;
+    const statusText = sendRes.statusText;
+    const resUrl = sendRes.url;
+    const resHeaders = sendRes.headers;
+    const bodyRid = sendRes.rid;
+
+    let isClosed = false;
+    const cancelBody = () => isClosed ? Promise.resolve() : (isClosed = true, invokeTauri('plugin:http|fetch_cancel_body', { rid: bodyRid }).catch(() => {}));
+
+    const stream = [101, 103, 204, 205, 304].includes(status) ? null : new ReadableStream({
+      start(ctl) {
+        signal?.addEventListener('abort', () => {
+          ctl.error(new Error(CANCEL_ERR));
+          cancelBody();
+        });
+      },
+      pull: async (ctl) => {
+        let chunkBytes;
+        try {
+          chunkBytes = await invokeTauri('plugin:http|fetch_read_body', { rid: bodyRid });
+        } catch (t) {
+          ctl.error(t);
+          return void cancelBody();
+        }
+        const u8 = new Uint8Array(chunkBytes);
+        const eof = u8[u8.byteLength - 1];
+        const payload = u8.slice(0, u8.byteLength - 1);
+        if (eof !== 1) {
+          ctl.enqueue(payload);
+        } else {
+          ctl.close();
+        }
+      },
+      cancel() {
+        cancelBody();
+      }
+    });
+
+    const response = new Response(stream, { status, statusText });
+    Object.defineProperty(response, 'url', { value: resUrl, writable: false });
+    Object.defineProperty(response, 'headers', { value: new Headers(resHeaders), writable: false });
+    return response;
+  }
+
+  return { fetch: tauriFetch };
+})();
+
+if (typeof window !== 'undefined') {
+  if (!window.__TAURI__) window.__TAURI__ = {};
+  window.__TAURI__.http = __TAURI_PLUGIN_HTTP__;
+}
+
+// Global fetch override for Tauri Desktop
+(function() {
+  const origFetch = window.fetch.bind(window);
+
+  window.fetch = async function(input, init) {
+    const isTauriEnv = !!(typeof window !== 'undefined' && ((window.__TAURI__ && window.__TAURI__.core) || window.__TAURI_INTERNALS__ || location.protocol === 'tauri:' || location.hostname === 'tauri.localhost'));
+    const url = typeof input === 'string' ? input : (input && input.url) || String(input || '');
+
+    if (isTauriEnv && /^https?:\/\//i.test(url)) {
+      try {
+        return await __TAURI_PLUGIN_HTTP__.fetch(input, init);
+      } catch (err) {
+        console.error('[desktop-fetch] Native HTTP request failed:', err, 'for URL:', url);
+        throw err;
+      }
+    }
+
+    return origFetch(input, init);
   };
 })();
+  </script>
+  <script>
+// Optional Plugins (Dialog, Updater) - isolated in separate try-catches
+try {
+  if (typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core) {
+    var __TAURI_PLUGIN_DIALOG__=function(n,e){"use strict";function t(n){if(void 0!==n)return"string"==typeof n?n:"ok"in n&&"cancel"in n?{OkCancelCustom:[n.ok,n.cancel]}:"yes"in n&&"no"in n&&"cancel"in n?{YesNoCancelCustom:[n.yes,n.no,n.cancel]}:"ok"in n?{OkCustom:n.ok}:void 0}async function o(n,o){return await e.invoke("plugin:dialog|message",{message:n,title:o?.title,kind:o?.kind,buttons:t(o?.buttons)})}return n.ask=async function(n,e){const t="string"==typeof e?{title:e}:e,i=t?.okLabel||t?.cancelLabel,a=t?.okLabel??"Yes";return await o(n,{title:t?.title,kind:t?.kind,buttons:i?{ok:a,cancel:t.cancelLabel??"No"}:"YesNo"})===a},n.confirm=async function(n,e){const t="string"==typeof e?{title:e}:e,i=t?.okLabel||t?.cancelLabel,a=t?.okLabel??"Ok";return await o(n,{title:t?.title,kind:t?.kind,buttons:i?{ok:a,cancel:t.cancelLabel??"Cancel"}:"OkCancel"})===a},n.message=async function(n,e){const t="string"==typeof e?{title:e}:e;return t&&!t.buttons&&t.okLabel&&(t.buttons={ok:t.okLabel}),o(n,t)},n.open=async function(n={}){return"object"==typeof n&&Object.freeze(n),await e.invoke("plugin:dialog|open",{options:n})},n.save=async function(n={}){return"object"==typeof n&&Object.freeze(n),await e.invoke("plugin:dialog|save",{options:n})},n}({},window.__TAURI__.core);Object.defineProperty(window.__TAURI__,"dialog",{value:__TAURI_PLUGIN_DIALOG__});
+  }
+} catch (e) { console.warn('Dialog plugin init failed:', e); }
+
+try {
+  if (typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.Resource) {
+    var __TAURI_PLUGIN_UPDATER__=function(e,n){"use strict";class a extends n.Resource{constructor(e){super(e.rid),this.available=!0,this.currentVersion=e.currentVersion,this.version=e.version,this.date=e.date,this.body=e.body,this.rawJson=e.rawJson}async download(e,a){const s=new n.Channel;e&&(s.onmessage=e);const d=await n.invoke("plugin:updater|download",{onEvent:s,rid:this.rid,...a,headers:t(a?.headers)});await(this.downloadedBytes?.close().catch(()=>{})),this.downloadedBytes=new n.Resource(d)}async install(e){if(!this.downloadedBytes)throw new Error("Update.install called before Update.download");await n.invoke("plugin:updater|install",{updateRid:this.rid,bytesRid:this.downloadedBytes.rid,...e}),this.downloadedBytes=void 0}async downloadAndInstall(e,a){const s=new n.Channel;e&&(s.onmessage=e),await n.invoke("plugin:updater|download_and_install",{onEvent:s,rid:this.rid,...a,headers:t(a?.headers)})}async close(){await(this.downloadedBytes?.close()),await super.close()}}function t(e){return e?Array.from(new Headers(e).entries()):void 0}return e.Update=a,e.check=async function(e){const s=await n.invoke("plugin:updater|check",{...e,headers:t(e?.headers)});return s?new a(s):null},e}({},window.__TAURI__.core);Object.defineProperty(window.__TAURI__,"updater",{value:__TAURI_PLUGIN_UPDATER__});
+  }
+} catch (e) { console.warn('Updater plugin init failed:', e); }
 </script>
 <script>
     (() => {
@@ -1182,7 +1326,10 @@
         }
         // Browser mode: when served over HTTP/HTTPS by server.js, use relative base ''
         // so requests go through the server.js proxy without browser CORS restrictions.
-        if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+        // But only do this when actually served from a real HTTP server (not file://).
+        if ((window.location.protocol === 'http:' || window.location.protocol === 'https:')
+            && window.location.hostname !== '127.0.0.1'
+            && window.location.hostname !== 'localhost') {
           return '';
         }
         // If user provided a specific URL in Setup
@@ -1202,7 +1349,7 @@
             }
           } catch { }
         }
-        return S.cfg.freellmUrl || 'http://127.0.0.1:31415';
+        return 'http://127.0.0.1:31415';
       }
 
       // ---------- helpers ----------
@@ -1276,10 +1423,11 @@
           $('dot').className = 'dot bad';
           $('status').textContent = 'FreeLLMAPI not answering at ' + (base || 'proxy');
           S.backendStatus = 'disconnected';
-        } catch {
+        } catch (err) {
           const base = S.cfg.freellmUrl || 'http://127.0.0.1:31415';
           $('dot').className = 'dot bad';
-          $('status').textContent = 'FreeLLMAPI offline at ' + base;
+          const errMsg = err && err.message ? ' (' + err.message.slice(0, 35) + ')' : '';
+          $('status').textContent = 'FreeLLMAPI offline at ' + base + errMsg;
           S.backendStatus = 'disconnected';
         }
       }
@@ -2283,6 +2431,14 @@ $('btnClear').onclick = async () => {
       // ---------- boot ----------
       const saved = store.get('rt.cfg');
       if (saved) S.cfg = Object.assign(S.cfg, saved);
+      // Migrate stale config: if the saved freellmUrl points to the old Vite dev
+      // server (port 5173) or any non-FreeLLMAPI port, reset it to the correct
+      // FreeLLMAPI default so the app doesn't show "offline" on first launch.
+      if (S.cfg.freellmUrl && /:(5173|3000|8080|8000)\/?$/.test(S.cfg.freellmUrl)) {
+        console.warn('[boot] Stale freellmUrl detected (' + S.cfg.freellmUrl + '), resetting to 31415.');
+        S.cfg.freellmUrl = 'http://127.0.0.1:31415';
+        save();
+      }
       const savedMsgs = store.get('rt.msgs');
       if (Array.isArray(savedMsgs)) {
         // Filter out ghost empty model replies left from interrupted sessions/refreshes

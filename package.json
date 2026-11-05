@@ -6,11 +6,13 @@
   "license": "MIT",
   "scripts": {
     "start": "node server.js",
-    "build:mac": "cargo tauri build",
+    "build:mac": "RUSTC_WRAPPER='' cargo tauri build --bundles app",
     "build:dmg": "./scripts/build-and-notarize.sh",
     "test": "node test/e2e.js",
     "smoke": "node test/smoke.js",
-    "screenshots": "node test/screenshots.js"
+    "screenshots": "node test/screenshots.js",
+    "verify": "bash scripts/verify-install.sh",
+    "build:install": "RUSTC_WRAPPER='' cargo tauri build --bundles app && bash scripts/install-app.sh"
   },
   "engines": {
     "node": ">=18"
