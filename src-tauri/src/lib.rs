@@ -1,4 +1,6 @@
-use tauri::Manager;
+use std::sync::Mutex;
+use std::process::Child;
+use tauri::{Manager, RunEvent};
 
 /// Save artifact content to the user's Documents/Roundtable folder.
 #[tauri::command]
@@ -11,10 +13,15 @@ fn save_artifact_file(app: tauri::AppHandle, name: String, content: String) -> R
   Ok(path.to_string_lossy().into_owned())
 }
 
+/// Handle to the local proxy server.js child process, so we can kill it
+/// cleanly when the app closes instead of leaving a stale node process
+/// holding port 5173.
+struct ProxyServer(Mutex<Child>);
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   use tauri::Manager;
-  tauri::Builder::default()
+  let builder = tauri::Builder::default()
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
@@ -39,29 +46,21 @@ pub fn run() {
           Some(current_dir.join("../../server.js")),
         ];
 
-        // If a proxy is already answering on 5173 (stale process from a
-        // previous launch), don't spawn another — it would fail with
-        // EADDRINUSE and exit, leaving no working proxy.
-        let port_alive = std::net::TcpStream::connect_timeout(
-          &"127.0.0.1:5173".parse().unwrap(),
-          std::time::Duration::from_millis(300),
-        ).is_ok();
-
-        if !port_alive {
-          for candidate in candidates.iter().flatten() {
-            if candidate.exists() {
-              let mut cmd = std::process::Command::new("node");
-              cmd.arg(&candidate).arg("--tauri");
-              if let Ok(mut child) = cmd.spawn() {
-                // Detach so it lives as long as the app does
-                let _ = child;
+        for candidate in candidates.iter().flatten() {
+          if candidate.exists() {
+            let mut cmd = std::process::Command::new("node");
+            cmd.arg(&candidate).arg("--tauri");
+            match cmd.spawn() {
+              Ok(child) => {
                 println!("[tauri] Started local proxy: {:?}", candidate);
+                app.manage(ProxyServer(Mutex::new(child)));
               }
-              break;
+              Err(e) => {
+                println!("[tauri] Failed to start proxy: {}", e);
+              }
             }
+            break;
           }
-        } else {
-          println!("[tauri] Proxy already running on 5173, reusing");
         }
       }
 
@@ -73,7 +72,28 @@ pub fn run() {
         )?;
       }
       Ok(())
-    })
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    });
+
+  builder
+    .build(tauri::generate_context!())
+    .expect("error while building tauri application")
+    .run(|app_handle: &tauri::AppHandle<tauri::Wry>, event: tauri::RunEvent| {
+      // Kill the proxy child process when the app's event loop exits.
+      // This fires on all exit paths: red button, Cmd-Q, dock quit, force quit.
+      match event {
+        RunEvent::Exit | RunEvent::ExitRequested { .. } => {
+          println!("[tauri] App exiting — killing proxy");
+          if let Some(state) = app_handle.try_state::<ProxyServer>() {
+            if let Ok(mut guard) = state.0.lock() {
+              let pid = guard.id();
+              println!("[tauri] Killing proxy PID {}", pid);
+              let _ = guard.kill();
+              let _ = guard.wait();
+              println!("[tauri] Proxy killed");
+            }
+          }
+        }
+        _ => {}
+      }
+    });
 }
