@@ -13,7 +13,6 @@ fn save_artifact_file(app: tauri::AppHandle, name: String, content: String) -> R
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  use tauri::Manager;
   tauri::Builder::default()
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_fs::init())
