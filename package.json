@@ -9,6 +9,7 @@
     "build:mac": "cargo tauri build",
     "build:dmg": "./scripts/build-and-notarize.sh",
     "test": "node test/e2e.js",
+    "smoke": "node test/smoke.js",
     "screenshots": "node test/screenshots.js"
   },
   "engines": {

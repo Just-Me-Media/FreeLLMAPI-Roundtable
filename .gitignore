@@ -3,7 +3,17 @@ node_modules/
 *.log
 .env
 
+# Build output
+dist/
+
 # Built installers live on GitHub Releases
 releases/
+
+# Self-update signing keys — keep these OUT of the repo
+updater.key
+updater.key.pub
 *.key
+
+# Compiled Windows binary — belongs in Releases, not the source tree
+app.exe
 commit_msg.txt

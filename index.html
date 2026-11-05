@@ -843,6 +843,7 @@
     <button class="btn" id="btnTogglePreview" title="Toggle response preview pane">👁️ Preview</button>
     <button class="btn" id="btnSetup">⚙️ Setup</button>
     <button class="btn" id="btnExport">Export</button>
+    <button class="btn" id="btnUpdate" title="Check for app updates">🔄 Update</button>
     <button class="btn danger" id="btnClear">New chat</button>
   </header>
 
@@ -1132,11 +1133,12 @@
         if (window.location.origin.includes(':5173')) {
           return '';
         }
-        // Tauri desktop: use local proxy server
+        // Tauri desktop: the Rust setup hook starts server.js on 5173,
+        // so we route through the proxy (same-origin, no CORP issues).
         if (isTauri()) {
           return 'http://127.0.0.1:5173';
         }
-        // If user provided a specific URL in Setup
+        // Browser mode: if user provided a specific URL in Setup
         if (S.cfg.freellmUrl && S.cfg.freellmUrl.trim()) {
           return S.cfg.freellmUrl.trim().replace(/\/+$/, '');
         }
@@ -1200,33 +1202,27 @@
           console.log('[checkHealth] Location:', window.location.origin);
           console.log('[checkHealth] Has Tauri:', !!window.__TAURI__);
           
-          const viaProxy = window.location.origin.includes(':5173');
-          if (viaProxy || isTauri()) {
-            console.log('[checkHealth] Using proxy health check');
-            const r = await fetch((viaProxy ? '' : 'http://127.0.0.1:5173') + '/health');
-            console.log('[checkHealth] Fetch response:', r.status, r.statusText);
+          const base = await getApiBase();
+          console.log('[checkHealth] Probing at', base);
+          // In Tauri mode the Rust setup hook starts server.js on 5173,
+          // which proxies /health and /v1/* to FreeLLMAPI with CORS headers.
+          // In browser mode, base is '' (same-origin) so /health works directly.
+          const healthUrl = base ? base + '/health' : '/health';
+          const r = await fetch(healthUrl);
+          console.log('[checkHealth] Fetch response:', r.status, r.statusText);
+          if (r.ok) {
             const j = await r.json();
-            console.log('[checkHealth] Health data:', j);
             if (j.upstream) {
               $('dot').className = 'dot ok';
-              $('status').textContent = 'FreeLLMAPI connected (' + j.target + ')';
+              $('status').textContent = 'FreeLLMAPI connected (' + (j.target || base) + ')';
               S.backendStatus = 'upstream';
               console.log('[checkHealth] Success - backend connected');
               return;
             }
           }
-          // Standalone app / Direct mode: probe base URL directly
-          const base = await getApiBase();
-          const r = await fetch(base + '/api/ping');
-          if (r.ok || r.status) {
-            $('dot').className = 'dot ok';
-            $('status').textContent = 'FreeLLMAPI connected (' + base + ')';
-            S.backendStatus = 'upstream';
-          } else {
-            $('dot').className = 'dot bad';
-            $('status').textContent = 'FreeLLMAPI not answering at ' + base;
-            S.backendStatus = 'disconnected';
-          }
+          $('dot').className = 'dot bad';
+          $('status').textContent = 'FreeLLMAPI not answering at ' + (base || 'proxy');
+          S.backendStatus = 'disconnected';
         } catch {
           const base = S.cfg.freellmUrl || 'http://127.0.0.1:31415';
           $('dot').className = 'dot bad';
@@ -2003,7 +1999,53 @@
       $('btnClose').onclick = closeSetup;
       $('overlay').addEventListener('mousedown', e => { if (e.target.id === 'overlay') closeSetup(); });
       $('btnExport').onclick = exportMd;
-      $('btnClear').onclick = async () => {
+      // ---------- App Updates (Tauri updater) ----------
+async function checkAndUpdate() {
+  if (!window.__TAURI__) {
+    await modalAlert('App updates are only available inside the Roundtable desktop app. Run it from Applications or the installer.', 'No Tauri runtime');
+    return;
+  }
+  const T = window.__TAURI_;
+  const U = T.updater;
+  if (!U) {
+    await modalAlert('The updater plugin is not available in this build.', 'Update unavailable');
+    return;
+  }
+  let busy = false;
+  const setBusy = v => {
+    busy = v;
+    const b = $('btnUpdate');
+    if (b) { b.disabled = v; b.textContent = v ? 'Checking…' : '🔄 Update'; }
+  };
+  setBusy(true);
+  try {
+    const update = await U.check();
+    if (!update) {
+      await modalAlert('You\'re on the latest version. No update needed.', 'Up to date');
+      return;
+    }
+    const shouldInstall = await modalConfirm(
+      `Version ${update.version} is available (you're on ${T.version || 'unknown'}). Install now?`,
+      'Update available'
+    );
+    if (!shouldInstall) return;
+    await update.downloadAndInstall(ev => {
+      const s = ev || {};
+      const tag = s.event;
+      if (tag === 'Started') $('status').textContent = 'Downloading…';
+      else if (tag === 'Progress') $('status').textContent = `Downloaded ${((s.chunk_length || 0) / 1024 / 1024).toFixed(1)} MB`;
+      else if (tag === 'Finished') $('status').textContent = 'Download complete, installing…';
+    });
+    await modalAlert('Update installed. Restart Roundtable to use it.', 'Restart required');
+  } catch (err) {
+    await modalAlert('Update failed: ' + (err && err.message ? err.message : String(err)), 'Update error');
+  } finally {
+    setBusy(false);
+  }
+}
+$('btnUpdate').onclick = () => { if (!busy) checkAndUpdate(); };
+
+$('btnClear').onclick = async () => {
         if (S.running) return;
         if (S.msgs.length) {
           const saveFirst = await modalConfirm(
@@ -2022,7 +2064,17 @@
         }
         S.msgs = [];
         S.activeChatId = null;
+        // Reset the whole table: clear artifacts, strategy (slots), and rounds
+        artifactHistory = [];
+        artifactCurrentIdx = -1;
+        artifactDiffOpen = false;
+        localStorage.removeItem('rt.artifactHistory');
+        S.cfg.slots = [];
+        S.cfg.rounds = 1;
+        $('rounds').value = '1';
+        renderLineup();
         renderChat();
+        refreshArtifactPane();
         save();
       };
 

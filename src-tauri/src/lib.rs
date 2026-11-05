@@ -1,8 +1,43 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  use tauri::Manager;
   tauri::Builder::default()
+    .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .setup(|app| {
+      // Start the local proxy server (server.js) so the webview can reach
+      // FreeLLMAPI on localhost:5173 (same-origin). Without this, the
+      // webview's browser fetch is blocked by FreeLLMAPI's
+      // Cross-Origin-Resource-Policy: same-origin header.
+      if !cfg!(debug_assertions) {
+        let app_handle = app.handle().clone();
+        let resource_dir = app_handle.path().resource_dir().ok();
+        let resource_dir_up = resource_dir.clone();
+        let current_dir = std::env::current_dir().unwrap_or_default();
+
+        // Look for server.js in: resource dir (+ _up_ subdir), current dir, or project root
+        let candidates = [
+          resource_dir.map(|p| p.join("server.js")),
+          resource_dir_up.map(|p| p.join("_up_/server.js")),
+          Some(current_dir.join("server.js")),
+          // Tauri sets CWD to the .app/Contents/MacOS dir; go up 3 levels
+          Some(current_dir.join("../../server.js")),
+        ];
+
+        for candidate in candidates.iter().flatten() {
+          if candidate.exists() {
+            let mut cmd = std::process::Command::new("node");
+            cmd.arg(&candidate).arg("--tauri");
+            if let Ok(mut child) = cmd.spawn() {
+              // Detach so it lives as long as the app does
+              let _ = child;
+              println!("[tauri] Started local proxy: {:?}", candidate);
+            }
+            break;
+          }
+        }
+      }
+
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
