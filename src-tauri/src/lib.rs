@@ -1,6 +1,4 @@
-use std::sync::Mutex;
-use std::process::Child;
-use tauri::{Manager, RunEvent};
+use tauri::Manager;
 
 /// Save artifact content to the user's Documents/Roundtable folder.
 #[tauri::command]
@@ -13,57 +11,14 @@ fn save_artifact_file(app: tauri::AppHandle, name: String, content: String) -> R
   Ok(path.to_string_lossy().into_owned())
 }
 
-/// Handle to the local proxy server.js child process, so we can kill it
-/// cleanly when the app closes instead of leaving a stale node process
-/// holding port 5173.
-struct ProxyServer(Mutex<Child>);
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   use tauri::Manager;
-  let builder = tauri::Builder::default()
+  tauri::Builder::default()
     .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_fs::init())
-    .plugin(tauri_plugin_updater::Builder::new().build())
     .invoke_handler(tauri::generate_handler![save_artifact_file])
     .setup(|app| {
-      // Start the local proxy server (server.js) so the webview can reach
-      // FreeLLMAPI on localhost:5173 (same-origin). Without this, the
-      // webview's browser fetch is blocked by FreeLLMAPI's
-      // Cross-Origin-Resource-Policy: same-origin header.
-      if !cfg!(debug_assertions) {
-        let app_handle = app.handle().clone();
-        let resource_dir = app_handle.path().resource_dir().ok();
-        let resource_dir_up = resource_dir.clone();
-        let current_dir = std::env::current_dir().unwrap_or_default();
-
-        // Look for server.js in: resource dir (+ _up_ subdir), current dir, or project root
-        let candidates = [
-          resource_dir.map(|p| p.join("server.js")),
-          resource_dir_up.map(|p| p.join("_up_/server.js")),
-          Some(current_dir.join("server.js")),
-          // Tauri sets CWD to the .app/Contents/MacOS dir; go up 3 levels
-          Some(current_dir.join("../../server.js")),
-        ];
-
-        for candidate in candidates.iter().flatten() {
-          if candidate.exists() {
-            let mut cmd = std::process::Command::new("node");
-            cmd.arg(&candidate).arg("--tauri");
-            match cmd.spawn() {
-              Ok(child) => {
-                println!("[tauri] Started local proxy: {:?}", candidate);
-                app.manage(ProxyServer(Mutex::new(child)));
-              }
-              Err(e) => {
-                println!("[tauri] Failed to start proxy: {}", e);
-              }
-            }
-            break;
-          }
-        }
-      }
-
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()
@@ -72,28 +27,7 @@ pub fn run() {
         )?;
       }
       Ok(())
-    });
-
-  builder
-    .build(tauri::generate_context!())
-    .expect("error while building tauri application")
-    .run(|app_handle: &tauri::AppHandle<tauri::Wry>, event: tauri::RunEvent| {
-      // Kill the proxy child process when the app's event loop exits.
-      // This fires on all exit paths: red button, Cmd-Q, dock quit, force quit.
-      match event {
-        RunEvent::Exit | RunEvent::ExitRequested { .. } => {
-          println!("[tauri] App exiting — killing proxy");
-          if let Some(state) = app_handle.try_state::<ProxyServer>() {
-            if let Ok(mut guard) = state.0.lock() {
-              let pid = guard.id();
-              println!("[tauri] Killing proxy PID {}", pid);
-              let _ = guard.kill();
-              let _ = guard.wait();
-              println!("[tauri] Proxy killed");
-            }
-          }
-        }
-        _ => {}
-      }
-    });
+    })
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application");
 }

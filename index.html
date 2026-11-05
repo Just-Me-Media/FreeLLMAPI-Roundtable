@@ -1084,6 +1084,23 @@
   </div>
 
   <script>
+/* desktop-fetch-shim: in the desktop app, http(s) requests go through the native
+   HTTP plugin, so the WebView's CORS rules cannot block FreeLLMAPI, Ollama or
+   LM Studio. In a browser (npm start) window.__TAURI__ is absent: no change. */
+(function () {
+  if (!window.__TAURI__) return;
+  var webFetch = window.fetch.bind(window);
+  window.fetch = function (input, init) {
+    var T = window.__TAURI__;
+    var url = typeof input === 'string' ? input : (input && input.url) || String(input || '');
+    if (T && T.http && typeof T.http.fetch === 'function' && /^https?:\/\//i.test(url)) {
+      return T.http.fetch(input, init);
+    }
+    return webFetch(input, init);
+  };
+})();
+</script>
+<script>
     (() => {
       'use strict';
 
@@ -1160,10 +1177,13 @@
         if (window.location.origin.includes(':5173')) {
           return '';
         }
-        // Tauri desktop: the Rust setup hook starts server.js on 5173,
-        // so we route through the proxy (same-origin, no CORP issues).
+        // Desktop app: talks to FreeLLMAPI directly through the native HTTP
+        // plugin (see desktop-fetch-shim). No proxy server needed.
         if (isTauri()) {
-          return 'http://127.0.0.1:5173';
+          if (S.cfg.freellmUrl && S.cfg.freellmUrl.trim()) {
+            return S.cfg.freellmUrl.trim().replace(/\/+$/, '');
+          }
+          return 'http://127.0.0.1:31415';
         }
         // Browser mode: if user provided a specific URL in Setup
         if (S.cfg.freellmUrl && S.cfg.freellmUrl.trim()) {
@@ -1231,21 +1251,18 @@
           
           const base = await getApiBase();
           console.log('[checkHealth] Probing at', base);
-          // In Tauri mode the Rust setup hook starts server.js on 5173,
-          // which proxies /health and /v1/* to FreeLLMAPI with CORS headers.
-          // In browser mode, base is '' (same-origin) so /health works directly.
-          const healthUrl = base ? base + '/health' : '/health';
+          // Desktop app: probe FreeLLMAPI's /api/ping directly (native HTTP
+          // plugin bypasses the CORP that blocks the webview's fetch).
+          // Browser mode: base is '' so /health is same-origin.
+          const healthUrl = base ? base + '/api/ping' : '/health';
           const r = await fetch(healthUrl);
           console.log('[checkHealth] Fetch response:', r.status, r.statusText);
-          if (r.ok) {
-            const j = await r.json();
-            if (j.upstream) {
-              $('dot').className = 'dot ok';
-              $('status').textContent = 'FreeLLMAPI connected (' + (j.target || base) + ')';
-              S.backendStatus = 'upstream';
-              console.log('[checkHealth] Success - backend connected');
-              return;
-            }
+          if (r.ok || r.status === 200) {
+            $('dot').className = 'dot ok';
+            $('status').textContent = 'FreeLLMAPI connected (' + (base || 'proxy') + ')';
+            S.backendStatus = 'upstream';
+            console.log('[checkHealth] Success - backend connected');
+            return;
           }
           $('dot').className = 'dot bad';
           $('status').textContent = 'FreeLLMAPI not answering at ' + (base || 'proxy');
