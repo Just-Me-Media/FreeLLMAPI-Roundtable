@@ -39,17 +39,29 @@ pub fn run() {
           Some(current_dir.join("../../server.js")),
         ];
 
-        for candidate in candidates.iter().flatten() {
-          if candidate.exists() {
-            let mut cmd = std::process::Command::new("node");
-            cmd.arg(&candidate).arg("--tauri");
-            if let Ok(mut child) = cmd.spawn() {
-              // Detach so it lives as long as the app does
-              let _ = child;
-              println!("[tauri] Started local proxy: {:?}", candidate);
+        // If a proxy is already answering on 5173 (stale process from a
+        // previous launch), don't spawn another — it would fail with
+        // EADDRINUSE and exit, leaving no working proxy.
+        let port_alive = std::net::TcpStream::connect_timeout(
+          &"127.0.0.1:5173".parse().unwrap(),
+          std::time::Duration::from_millis(300),
+        ).is_ok();
+
+        if !port_alive {
+          for candidate in candidates.iter().flatten() {
+            if candidate.exists() {
+              let mut cmd = std::process::Command::new("node");
+              cmd.arg(&candidate).arg("--tauri");
+              if let Ok(mut child) = cmd.spawn() {
+                // Detach so it lives as long as the app does
+                let _ = child;
+                println!("[tauri] Started local proxy: {:?}", candidate);
+              }
+              break;
             }
-            break;
           }
+        } else {
+          println!("[tauri] Proxy already running on 5173, reusing");
         }
       }
 
