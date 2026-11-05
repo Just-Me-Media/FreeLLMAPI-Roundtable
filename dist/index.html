@@ -780,8 +780,8 @@
       background: var(--bg);
       cursor: pointer;
       display: flex;
-      align-items: center;
-      gap: 8px;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .chat-item:hover {
@@ -794,7 +794,6 @@
     }
 
     .chat-item .title {
-      flex: 1;
       font-weight: 600;
       font-size: 14px;
       overflow: hidden;
@@ -802,9 +801,36 @@
       white-space: nowrap;
     }
 
+    .chat-item .preview {
+      font-size: 11px;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .chat-item .meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      color: var(--muted);
+    }
+
+    .chat-item .meta span {
+      background: var(--panel);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
     .chat-item .time {
       font-size: 11px;
       color: var(--muted);
+      align-self: flex-end;
+    }
+
+    .chat-item .iconbtn {
+      align-self: flex-start;
     }
 
     .banner {
@@ -887,7 +913,8 @@
           <div style="padding:8px 12px;border-top:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;">
             <button class="btn" id="btnCopyArtifact" style="font-size:11px;padding:3px 8px">📋 Copy</button>
             <button class="btn" id="btnDownloadArtifact" style="font-size:11px;padding:3px 8px">⬇️ Download</button>
-            <button class="btn" id="btnSaveArtifactHistory" style="font-size:11px;padding:3px 8px">💾 History</button>
+            <button class="btn" id="btnSaveArtifactFile" style="font-size:11px;padding:3px 8px">💾 Save to File</button>
+            <button class="btn" id="btnSaveArtifactHistory" style="font-size:11px;padding:3px 8px">🗂️ History</button>
             <button class="btn danger" id="btnResetArtifactHistory" style="font-size:11px;padding:3px 8px">🗑️ Reset</button>
           </div>
         </div>
@@ -1929,11 +1956,22 @@
           const c = S.chats[id];
           const active = id === S.activeChatId ? ' active' : '';
           const dateStr = new Date(c.time).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          const firstUser = c.msgs.find(m => m.role === 'user');
+          const preview = firstUser ? esc(firstUser.text.slice(0, 60)) : '';
+          const artifactCount = c.artifactHistory ? c.artifactHistory.length : 0;
+          const modelCount = c.slots ? c.slots.length : 0;
           return `
         <div class="chat-item${active}" data-chat-id="${id}">
-          <div class="title">${esc(c.title || 'Untitled')}</div>
+          <div class="chat-head">
+            <div class="title">${esc(c.title || 'Untitled')}</div>
+            <button class="iconbtn" data-del-chat="${id}" title="Delete chat">✕</button>
+          </div>
+          <div class="preview">${preview || '<em>No preview</em>'}</div>
+          <div class="meta">
+            <span>${modelCount} model${modelCount!==1?'s':''}</span>
+            ${artifactCount ? `<span>• ${artifactCount} artifact${artifactCount!==1?'s':''}</span>` : ''}
+          </div>
           <div class="time">${dateStr}</div>
-          <button class="iconbtn" data-del-chat="${id}" title="Delete chat">✕</button>
         </div>
       `;
         }).join('');
@@ -1944,7 +1982,12 @@
         const firstUser = S.msgs.find(m => m.role === 'user');
         const title = firstUser ? (firstUser.text.slice(0, 36) + '…') : 'Roundtable ' + new Date().toLocaleTimeString();
         const id = S.activeChatId || nid();
-        S.chats[id] = { id, title, msgs: [...S.msgs], time: Date.now() };
+        S.chats[id] = {
+          id, title, msgs: [...S.msgs], time: Date.now(),
+          slots: JSON.parse(JSON.stringify(S.cfg.slots || [])),
+          rounds: S.cfg.rounds || 1,
+          artifactHistory: artifactHistory.length ? JSON.parse(JSON.stringify(artifactHistory)) : null,
+        };
         S.activeChatId = id;
         save();
         renderChatsList();
@@ -1969,8 +2012,17 @@
         if (S.chats[id]) {
           S.msgs = [...S.chats[id].msgs];
           S.activeChatId = id;
+          // Restore slots, rounds, and artifact history from the saved chat
+          if (S.chats[id].slots) { S.cfg.slots = JSON.parse(JSON.stringify(S.chats[id].slots)); save(); renderSlots(); }
+          if (S.chats[id].rounds) { S.cfg.rounds = S.chats[id].rounds; }
+          if (S.chats[id].artifactHistory && S.chats[id].artifactHistory.length) {
+            artifactHistory = JSON.parse(JSON.stringify(S.chats[id].artifactHistory));
+            artifactCurrentIdx = artifactHistory.length - 1;
+            artifactDiffOpen = false;
+          }
           renderChat();
           scrollDown(true);
+          refreshArtifactPane();
           closeChatsDrawer();
         }
       };
@@ -2423,6 +2475,25 @@ $('btnClear').onclick = async () => {
   $('btnSaveArtifactHistory').onclick = () => {
     try { localStorage.setItem('rt.artifactHistory',JSON.stringify(artifactHistory)); const b=$('btnSaveArtifactHistory'); b.textContent='\u2705 Saved'; setTimeout(()=>b.textContent='\uD83D\uDCBE History',1500); }
     catch(e) { alert('Could not save: '+e.message); }
+  };
+  $('btnSaveArtifactFile').onclick = async () => {
+    if (artifactCurrentIdx<0) { alert('No artifact to save.'); return; }
+    const {lang,text}=artifactHistory[artifactCurrentIdx];
+    const ext=(lang==='markdown'||lang==='md')?'md':lang||'txt';
+    const name=prompt('Save artifact as:',`artifact.${ext}`)||`artifact.${ext}`;
+    if (!name) return;
+    const isTauri = () => !!(window.__TAURI__ || location.protocol==='tauri:');
+    if (isTauri()) {
+      try {
+        const { invoke } = await window.__TAURI__.core;
+        const path = await invoke('save_artifact_file', { name, content: text });
+        const b=$('btnSaveArtifactFile'); b.textContent='\u2705 Saved to '+path.split('/').pop();
+        setTimeout(()=>b.textContent='\ud83d\udcbe Save to File',2500);
+      } catch(e) { alert('Save failed: '+e.message); }
+    } else {
+      const blob=new Blob([text],{type:'text/plain'}),a=document.createElement('a');
+      a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    }
   };
   $('btnResetArtifactHistory').onclick = () => {
     if (!confirm('Clear all artifact versions?')) return;

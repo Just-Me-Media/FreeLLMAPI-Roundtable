@@ -1,9 +1,24 @@
+use tauri::Manager;
+
+/// Save artifact content to the user's Documents/Roundtable folder.
+#[tauri::command]
+fn save_artifact_file(app: tauri::AppHandle, name: String, content: String) -> Result<String, String> {
+  let docs = app.path().document_dir().map_err(|e| e.to_string())?
+    .join("Roundtable");
+  std::fs::create_dir_all(&docs).map_err(|e| e.to_string())?;
+  let path = docs.join(&name);
+  std::fs::write(&path, content).map_err(|e| e.to_string())?;
+  Ok(path.to_string_lossy().into_owned())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   use tauri::Manager;
   tauri::Builder::default()
     .plugin(tauri_plugin_http::init())
+    .plugin(tauri_plugin_fs::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
+    .invoke_handler(tauri::generate_handler![save_artifact_file])
     .setup(|app| {
       // Start the local proxy server (server.js) so the webview can reach
       // FreeLLMAPI on localhost:5173 (same-origin). Without this, the
