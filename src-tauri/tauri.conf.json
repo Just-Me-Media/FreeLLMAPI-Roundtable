@@ -22,6 +22,8 @@
     }
   },
   "plugins": {
+    "http": {},
+    "fs": {},
     "updater": {
       "active": true,
       "endpoints": [
