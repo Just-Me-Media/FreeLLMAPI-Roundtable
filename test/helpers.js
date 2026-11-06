@@ -8,7 +8,7 @@ const os = require('os');
 const fs = require('fs');
 
 const MOCK_PORT = 41415;
-const APP_PORT = 5199;
+const APP_PORT = Number(process.env.APP_PORT || 5199);
 
 function waitFor(url, tries = 60) {
   return new Promise((resolve, reject) => {

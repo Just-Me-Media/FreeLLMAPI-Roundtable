@@ -5,7 +5,7 @@
   "identifier": "media.justme.roundtable",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyQjBGMTM3MEYxRjRDOUQKUldTZFRCOFBOL0d3MHVxOU00IVEvYkFKTXk2NGZCSERSNnBEc0tBV29DM0MyeVR1WjJZQnp6NUQK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyQjBGMTM3MEYxRjRDOUQKUldTZFRCOFBOL0d3MHVxOU00OVEvYkFKTXk2NGZCSERSNnBEc0tBV29DM0MyeVR1WjJZQnp6NUQK"
     }
   },
   "build": {
@@ -28,7 +28,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi", "nsis"],
+    "targets": [
+      "msi",
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

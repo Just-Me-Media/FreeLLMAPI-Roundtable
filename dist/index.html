@@ -1204,6 +1204,8 @@ var __TAURI_PLUGIN_HTTP__ = (function() {
 })();
 
 if (typeof window !== 'undefined') {
+  // True only inside the desktop app. Do NOT use `!!window.__TAURI__`: the line below creates a stub in plain browsers.
+  window.__rtIsTauri = () => !!(window.__TAURI_INTERNALS__ || location.protocol === 'tauri:' || location.hostname === 'tauri.localhost');
   if (!window.__TAURI__) window.__TAURI__ = {};
   window.__TAURI__.http = __TAURI_PLUGIN_HTTP__;
 }
@@ -1213,7 +1215,7 @@ if (typeof window !== 'undefined') {
   const origFetch = window.fetch.bind(window);
 
   window.fetch = async function(input, init) {
-    const isTauriEnv = !!(typeof window !== 'undefined' && ((window.__TAURI__ && window.__TAURI__.core) || window.__TAURI_INTERNALS__ || location.protocol === 'tauri:' || location.hostname === 'tauri.localhost'));
+    const isTauriEnv = typeof window !== 'undefined' && window.__rtIsTauri();
     const url = typeof input === 'string' ? input : (input && input.url) || String(input || '');
 
     if (isTauriEnv && /^https?:\/\//i.test(url)) {
@@ -1314,7 +1316,7 @@ try {
       };
 
       // ---------- API URL resolution ----------
-      const isTauri = () => !!(window.__TAURI__ || window.__TAURI_INTERNALS__ || location.protocol === 'tauri:' || location.hostname === 'tauri.localhost');
+      const isTauri = () => window.__rtIsTauri();
       async function getApiBase() {
         // Desktop app: talks to FreeLLMAPI directly through the native HTTP
         // plugin (see desktop-fetch-shim). No proxy server needed.
@@ -1324,13 +1326,18 @@ try {
           }
           return 'http://127.0.0.1:31415';
         }
-        // Browser mode: when served over HTTP/HTTPS by server.js, use relative base ''
-        // so requests go through the server.js proxy without browser CORS restrictions.
-        // But only do this when actually served from a real HTTP server (not file://).
-        if ((window.location.protocol === 'http:' || window.location.protocol === 'https:')
-            && window.location.hostname !== '127.0.0.1'
-            && window.location.hostname !== 'localhost') {
-          return '';
+        // Browser mode: if this page is served by server.js, use the same-origin proxy (base '') so the
+        // browser never makes a cross-origin call to FreeLLMAPI. We ask the server itself via /health
+        // rather than guessing from the hostname.
+        if (window.location.protocol === 'http:' || window.location.protocol === 'https:') {
+          if (S.servedByProxy === undefined) {
+            try {
+              const r = await fetch('/health');
+              const j = r.ok ? await r.json() : null;
+              S.servedByProxy = !!(j && j.proxy === true);
+            } catch { S.servedByProxy = false; }
+          }
+          if (S.servedByProxy) return '';
         }
         // If user provided a specific URL in Setup
         if (S.cfg.freellmUrl && S.cfg.freellmUrl.trim()) {
@@ -2655,7 +2662,7 @@ $('btnClear').onclick = async () => {
     if (artifactCurrentIdx<0) { alert('No artifact to save.'); return; }
     const {lang,text}=artifactHistory[artifactCurrentIdx];
     const ext=(lang==='markdown'||lang==='md')?'md':lang||'txt';
-    const isTauri = () => !!(window.__TAURI__ || location.protocol==='tauri:');
+    const isTauri = () => window.__rtIsTauri();
     if (isTauri()) {
       // Native Save As dialog via tauri-plugin-dialog
       try {
