@@ -25,22 +25,22 @@ Roundtable streams replies as they arrive, can route through local engines such 
 
 ## 📥 Download Installers
 
-### Windows
-**Download the latest Windows installer:**
-- [Roundtable-Windows-x64-v0.2.0-beta.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Windows-x64-v0.2.0-beta.exe) (NSIS Installer, 1.9 MB)
-- [Roundtable-Windows-x64-v0.2.0-beta.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Windows-x64-v0.2.0-beta.msi) (Windows Installer, 2.8 MB)
-
-**System Requirements:** Windows 10/11 64-bit, FreeLLMAPI running on localhost:31415
-
 ### macOS
-**Download the latest macOS installer:**
-- [Roundtable-macOS-x64-v0.2.0-beta.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-macOS-x64-v0.2.0-beta.dmg) (Apple Silicon & Intel)
+**Download the latest macOS installer (Apple Silicon):**
+- [Roundtable_0.2.0_aarch64.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable_0.2.0_aarch64.dmg) (Native DMG, 6.1 MB)
 
 **System Requirements:** macOS 12+, FreeLLMAPI running on localhost:31415
 
+### Windows
+**Download the latest Windows installer:**
+- [Roundtable-Windows-x64-v0.2.0.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable-Windows-x64-v0.2.0.exe) (NSIS Installer)
+- [Roundtable-Windows-x64-v0.2.0.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable-Windows-x64-v0.2.0.msi) (Windows Installer)
+
+**System Requirements:** Windows 10/11 64-bit, FreeLLMAPI running on localhost:31415
+
 ### Linux
 **Download the latest Linux installer:**
-- [Roundtable-Linux-x64-v0.2.0-beta.AppImage](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0-beta/Roundtable-Linux-x64-v0.2.0-beta.AppImage)
+- [Roundtable-Linux-x64-v0.2.0.AppImage](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable-Linux-x64-v0.2.0.AppImage)
 
 **System Requirements:** Linux x64 with glibc 2.31+, FreeLLMAPI running on localhost:31415
 
@@ -106,10 +106,18 @@ FREELLMAPI_URL=http://127.0.0.1:31415 PORT=5173 npm start
 
 ## Building Desktop Apps Locally
 
-### macOS (.dmg)
+### macOS (.app & .dmg)
 Requires Rust and the Tauri CLI:
 ```bash
+# Build .app and install directly to /Applications/Roundtable.app:
+npm run build:install
+
+# Build standalone macOS .dmg disk image:
 npm run build:mac
+
+# Verify local installation, binary freshness, and FreeLLMAPI connectivity:
+npm run verify
+
 # Or to build, sign, and notarize:
 ./scripts/build-and-notarize.sh
 ```

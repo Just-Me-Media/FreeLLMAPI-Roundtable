@@ -1,12 +1,22 @@
-# Roundtable Windows HANDOFF
+# Roundtable Cross-Platform HANDOFF & Architecture Status
 
-**Canonical path:** `C:\JUST_ME_MEDIA_VAULT\JustMeMedia\01_ACTIVE\Roundtable\roundtable-win`
+**Canonical path (Windows):** `C:\JUST_ME_MEDIA_VAULT\JustMeMedia\01_ACTIVE\Roundtable\roundtable-win`  
+**Canonical path (macOS):** `/Users/williamcommu/Desktop/JUST_ME_MEDIA_VAULT/JustMeMedia/01_ACTIVE/FreeLLMAPI/Roundtable/roundtable`  
+**Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable  
 
-**Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable
+## Current State (v0.2.0)
 
-**Purpose:** Build and test the Windows desktop installer (MSI / NSIS) for Roundtable, which brings local, cloud, and FreeLLMAPI models into one role-based shared conversation. macOS builds are handled on the M1 Pro.
+- **macOS Build:** ✅ **Complete & Verified.**
+  - Installed and verified locally at `/Applications/Roundtable.app`.
+  - Built official Apple Silicon disk image: `src-tauri/target/release/bundle/dmg/Roundtable_0.2.0_aarch64.dmg` (6.1 MB).
+  - Native HTTP plugin fully operational via `__TAURI_PLUGIN_HTTP__` (bypasses WKWebView loopback sandbox issues).
+  - Verification suite active: `npm run verify` passes all 9 health checks.
+  - Rust security audit fixes applied (safe file naming with unit tests, restricted HTTP capability scopes).
+  - Updater plugin registered in `src-tauri/src/lib.rs` and Windows public key fixed.
 
-**Status:** In progress — local build running (`cargo tauri build`).
+- **Windows Build (ThinkCentre):**
+  - Run `build-windows.ps1` or `cargo tauri build --config tauri.windows.conf.json`.
+  - GitHub Actions `release.yml` is configured for manual dispatch (`workflow_dispatch`) so you can trigger builds on the ThinkCentre self-hosted runner on-demand.
 
 ## Build checklist (Windows ThinkCentre)
 
