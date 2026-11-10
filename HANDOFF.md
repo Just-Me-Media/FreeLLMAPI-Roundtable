@@ -12,9 +12,20 @@
   - Rust security audit fixes applied (safe file naming with unit tests, restricted HTTP capability scopes).
   - Updater plugin registered in `src-tauri/src/lib.rs` and Windows public key fixed.
 
-- **Windows Build (ThinkCentre):**
-  - Run `build-windows.ps1` or `cargo tauri build --config tauri.windows.conf.json`.
-  - GitHub Actions `release.yml` is configured for manual dispatch (`workflow_dispatch`) so you can trigger builds on the ThinkCentre self-hosted runner on-demand.
+- **Windows Build (ThinkCentre):** ✅ **Built, installed, and verified.**
+  - Built from `main` with `build-windows.ps1` (no GitHub Actions minutes used).
+  - NSIS installer: `src-tauri/target/release/bundle/nsis/Roundtable_0.2.0_x64-setup.exe`
+  - MSI: `src-tauri/target/release/bundle/msi/Roundtable_0.2.0_x64_en-US.msi`
+  - Staged copies: `C:\Temp\Roundtable\Roundtable-Windows-x64-v0.2.0.exe` / `.msi`
+  - Installed on the ThinkCentre; shortcut points directly at `app.exe`.
+  - Verified via WebView2 remote debugging:
+    - App launches and responds.
+    - FreeLLMAPI `/api/ping` returns 200 and the UI shows `FreeLLMAPI connected (http://127.0.0.1:31415)`.
+    - "Load FreeLLMAPI Models" loaded 327 models.
+    - Artifact "Save As…" writes a file successfully (Windows backslash path fix included).
+    - New chat resets preview/artifact state as intended.
+  - `cargo test` passes (2 Rust tests for safe artifact filenames).
+  - GitHub Actions `release.yml` remains manual-dispatch for optional runner builds.
 
 ## Build checklist (Windows ThinkCentre)
 
@@ -44,6 +55,9 @@
    - Launch `.exe` from `target/release/bundle/nsis/`
    - Verify window launches, Setup drawer opens, FreeLLMAPI detection works
    - Console: no Rust panic, no CSP errors
+   - Optional headless UI check: launch with
+     `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`
+     and drive the page through the Chrome DevTools Protocol.
 
 ## Do NOT push changes
 - GitHub Actions not used for this build
