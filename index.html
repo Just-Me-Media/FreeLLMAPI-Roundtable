@@ -2670,7 +2670,7 @@ $('btnClear').onclick = async () => {
         const path = await save({ defaultPath: `artifact.${ext}`, filters: [{ name: 'Artifact', extensions: [ext] }] });
         if (!path) return;
         const { invoke } = await window.__TAURI__.core;
-        await invoke('save_artifact_file', { name: path.split('/').pop(), content: text });
+        await invoke('save_artifact_file', { name: path.split(/[\\/]/).pop(), content: text });
         const b=$('btnSaveArtifactFile'); b.textContent='\u2705 Saved';
         setTimeout(()=>b.textContent='\u2B07\uFE0F Save As…',2000);
       } catch(e) { alert('Save failed: '+e.message); }
