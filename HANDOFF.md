@@ -80,6 +80,36 @@ Chat history persists in browser localStorage, so users won't lose conversations
 - `server-monitor.bat` - Auto-recovery monitor
 - `Roundtable-Start.bat` - Full launch (server + Tauri app)
 
+## OpenCode Consensus Desktop Launcher (macOS)
+
+A no-terminal desktop launcher lives on the Desktop:
+
+**`~/Desktop/OpenCode Consensus.app`**
+
+Double-click it to:
+1. Launch FreeLLMAPI (if not already running)
+2. Open OpenCode
+
+Then select either model inside OpenCode:
+- **`🏛️ Fusion Consensus (Parallel Models + Judge)`** — fan-out to all models, judge synthesizes
+- **`💻 Auto Free-Coding Chain`** — multi-model coding pipeline
+
+Both models are registered in `~/.config/opencode/opencode.jsonc` under the `freellmapi` provider.
+
+To rebuild the launcher (e.g. if Desktop icon is lost):
+```bash
+# Paste into Terminal
+osacompile -o ~/Desktop/"OpenCode Consensus.app" /tmp/consensus.applescript
+cp /Applications/OpenCode.app/Contents/Resources/icon.icns ~/Desktop/"OpenCode Consensus.app"/Contents/Resources/applet.icns
+```
+
+The source script is at `/tmp/consensus.applescript` (ephemeral — recreate from HANDOFF if needed):
+```applescript
+on run
+    do shell script "export PATH=/opt/homebrew/bin:$HOME/.local/bin:$PATH; if ! pgrep -f FreeLLMAPI >/dev/null 2>&1; then open -a /Applications/FreeLLMAPI.app; sleep 3; fi; open -a /Applications/OpenCode.app"
+end run
+```
+
 ## Links
 - CROSS_MACHINE_SYNC.md — sync protocol for Mac/Windows
 - `build-windows.ps1` — one-step Windows builder
