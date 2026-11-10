@@ -1,6 +1,6 @@
-# Roundtable Windows Build (ThinkCentre)
+# Roundtable Windows Build (ThinkCentre / Windows PC)
 # Builds the standalone Tauri .exe / .msi for Windows.
-# Run from: C:\JUST_ME_MEDIA_VAULT\JustMeMedia\01_ACTIVE\Roundtable\roundtable-win
+# Run from repository root: powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 
 param(
     [string]$Config = "windows"

@@ -1,7 +1,5 @@
 # Roundtable Cross-Platform HANDOFF & Architecture Status
 
-**Canonical path (Windows):** `C:\JUST_ME_MEDIA_VAULT\JustMeMedia\01_ACTIVE\Roundtable\roundtable-win`  
-**Canonical path (macOS):** `/Users/williamcommu/Desktop/JUST_ME_MEDIA_VAULT/JustMeMedia/01_ACTIVE/FreeLLMAPI/Roundtable/roundtable`  
 **Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable  
 
 ## Current State (v0.2.0)
