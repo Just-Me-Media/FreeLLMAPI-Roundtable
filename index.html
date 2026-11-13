@@ -1075,7 +1075,7 @@
       <h3 style="margin-top:14px">Active Table Lineup (Answer Order)</h3>
       <div id="slots"></div>
       <div class="row" style="display:flex;gap:6px">
-        <button class="btn" id="btnQuick">⚡ Quick start with recommended models</button>
+        <button class="btn" id="btnQuick">⚡ Quick start (auto-assign roles)</button>
       </div>
     </div>
   </div>
@@ -1104,7 +1104,7 @@
         <span class="spacer"></span>
         <button class="btn" id="btnCloseTemplates">✕</button>
       </div>
-      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and sets the last slot's role to Synthesizer.</p>
+      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and assigns template-specific roles to each model slot (slot 1 = drafter/outline, slot 2 = critic, last = synthesizer).</p>
       <div id="templatesList"></div>
     </div>
   </div>
@@ -1317,6 +1317,10 @@ try {
         { id: 'user-focus', label: 'Focus on user needs', value: 'You are the user advocate. Ensure all solutions prioritize user experience, accessibility, and real-world usability. Challenge technical complexity that doesn\'t serve users.' },
         { id: 'analyze', label: 'Analyze data patterns', value: 'You are the data analyst. Identify patterns, trends, and correlations in the responses. Find connections and synthesize insights from multiple viewpoints.' },
         { id: 'devils-advocate', label: 'Devils advocate', value: 'You are the devil\'s advocate. Challenge assumptions, question consensus, and explore counter-arguments to ensure robust decision-making.' },
+        { id: 'architecture', label: 'Design system architecture', value: 'You are the architect. Design scalable, maintainable system designs with proper patterns, component relationships, and technology stack decisions.' },
+        { id: 'performance', label: 'Optimize performance', value: 'You are the performance engineer. Identify bottlenecks, optimize algorithms, improve resource usage, and ensure efficient execution.' },
+        { id: 'security', label: 'Analyze security implications', value: 'You are the security analyst. Identify vulnerabilities, security risks, and ensure robust protection mechanisms in the proposed solutions.' },
+        { id: 'testing', label: 'Design test strategies', value: 'You are the testing expert. Design comprehensive test cases, edge case coverage, and validation strategies for the implemented solution.' },
       ];
 
       // ---------- state ----------
@@ -2143,7 +2147,13 @@ try {
           if (hit && !next.includes(hit)) next.push(hit);
         }
         if (!next.length) next.push(...all.slice(0, 3));
-        S.cfg.slots = next.map(m => ({ id: nid(), model: m, name: shortName(m), role: '' }));
+        // Assign roles: slot 1 = outline/drafter, slot 2 = critique, last = synthesizer
+        const quickRoles = ['outline', 'critique', 'synthesizer'];
+        S.cfg.slots = next.map((m, i) => {
+          const roleDef = quickRoles[i] || quickRoles[quickRoles.length - 1];
+          const roleObj = ROLE_TEMPLATES.find(r => r.id === roleDef);
+          return { id: nid(), model: m, name: shortName(m), role: roleObj ? roleObj.value : '' };
+        });
         renderSlots(); renderLineup(); save();
       }
 
@@ -2920,11 +2930,41 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
     
       // ---------- Templates Drawer ----------
       const TEMPLATES = [
-        { id: 'skill_writer', name: '📝 Skill Writer', desc: 'Produce a reusable SKILL.md file for AI assistants.', preamble: 'You are collaborating to produce a reusable AI assistant skill (SKILL.md file). The drafter writes the initial skill content, the critic stress-tests it for edge cases and gaps, and the synthesizer outputs the final clean SKILL.md in a fenced markdown block.' },
-        { id: 'lora_dataset', name: '🧠 LoRA Dataset Generator', desc: 'Generate instruction/response training pairs for LoRA fine-tuning.', preamble: 'You are collaborating to produce high-quality instruction/response training pairs for a LoRA fine-tune. The drafter generates 5 instruction+response pairs on the topic. The critic checks them for quality, bias, and accuracy. The synthesizer outputs the final pairs as a JSON array: [{"instruction": "...", "input": "", "response": "..."}]. Output MUST be in a fenced json block.' },
-        { id: 'prompt_pack', name: '📋 Prompt Pack Generator', desc: 'Create a battle-tested prompt pack for AI coders.', preamble: 'You are collaborating to produce a battle-tested prompt pack for AI coders. The drafter writes prompt variants, the critic evaluates which extracts the best model responses, and the synthesizer outputs the final prompts as a fenced markdown document with sections per use case.' },
-        { id: 'code_review', name: '🔍 Code Review Council', desc: 'Multi-model structured code or architecture review.', preamble: 'You are a panel of senior engineers reviewing code or architecture. Each participant independently reviews the submission, identifies bugs, anti-patterns, and improvements. The synthesizer produces a final structured review report in markdown with sections: Critical Issues, Suggestions, Positives.' },
-        { id: 'explain_coder', name: '🎓 Explain to New Coders', desc: 'Explain a concept clearly to a new programmer.', preamble: 'You are collaborating to explain a technical concept clearly to a new programmer. The drafter writes an initial explanation with an analogy and example code. The critic checks for clarity and correctness. The synthesizer outputs a final polished explanation in markdown with: Concept, Analogy, Example Code, Common Mistakes.' },
+        { 
+          id: 'skill_writer', 
+          name: '📝 Skill Writer', 
+          desc: 'Produce a reusable SKILL.md file for AI assistants.',
+          preamble: 'You are collaborating to produce a reusable AI assistant skill (SKILL.md file). The drafter writes the initial skill content, the critic stress-tests it for edge cases and gaps, and the synthesizer outputs the final clean SKILL.md in a fenced markdown block.',
+          roles: ['outline', 'critique', 'synthesizer']
+        },
+        { 
+          id: 'lora_dataset', 
+          name: '🧠 LoRA Dataset Generator', 
+          desc: 'Generate instruction/response training pairs for LoRA fine-tuning.',
+          preamble: 'You are collaborating to produce high-quality instruction/response training pairs for a LoRA fine-tune. The drafter generates 5 instruction+response pairs on the topic. The critic checks them for quality, bias, and accuracy. The synthesizer outputs the final pairs as a JSON array: [{"instruction": "...", "input": "", "response": "..."}]. Output MUST be in a fenced json block.',
+          roles: ['outline', 'critique', 'synthesizer']
+        },
+        { 
+          id: 'prompt_pack', 
+          name: '📋 Prompt Pack Generator', 
+          desc: 'Create a battle-tested prompt pack for AI coders.',
+          preamble: 'You are collaborating to produce a battle-tested prompt pack for AI coders. The drafter writes prompt variants, the critic evaluates which extracts the best model responses, and the synthesizer outputs the final prompts as a fenced markdown document with sections per use case.',
+          roles: ['outline', 'critique', 'synthesizer']
+        },
+        { 
+          id: 'code_review', 
+          name: '🔍 Code Review Council', 
+          desc: 'Multi-model structured code or architecture review.',
+          preamble: 'You are a panel of senior engineers reviewing code or architecture. Each participant independently reviews the submission, identifies bugs, anti-patterns, and improvements. The synthesizer produces a final structured review report in markdown with sections: Critical Issues, Suggestions, Positives.',
+          roles: ['outline', 'critique', 'synthesizer']
+        },
+        { 
+          id: 'explain_coder', 
+          name: '🎓 Explain to New Coders', 
+          desc: 'Explain a concept clearly to a new programmer.',
+          preamble: 'You are collaborating to explain a technical concept clearly to a new programmer. The drafter writes an initial explanation with an analogy and example code. The critic checks for clarity and correctness. The synthesizer outputs a final polished explanation in markdown with: Concept, Analogy, Example Code, Common Mistakes.',
+          roles: ['outline', 'critique', 'synthesizer']
+        },
       ];
     
       function openTemplatesDrawer() { $('templatesOverlay').classList.add('open'); renderTemplatesList(); }
@@ -2945,8 +2985,15 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
         const tpl = TEMPLATES.find(t => t.id === btn.dataset.tpl); if (!tpl) return;
         S.cfg.preamble = tpl.preamble;
         $('preamble').value = tpl.preamble;
-        // If there's at least one slot and the last one has no role, make it synthesizer
-        if (S.cfg.slots.length > 0) {
+        // Assign template-specific roles to each slot (slot 0 = first role, last = synthesizer)
+        if (S.cfg.slots.length > 0 && tpl.roles && tpl.roles.length) {
+          S.cfg.slots.forEach((slot, i) => {
+            const roleDef = tpl.roles[i] || tpl.roles[tpl.roles.length - 1];
+            const roleObj = ROLE_TEMPLATES.find(r => r.id === roleDef);
+            if (roleObj) slot.role = roleObj.value;
+          });
+        } else if (S.cfg.slots.length > 0) {
+          // Fallback: last slot = synthesizer
           const last = S.cfg.slots[S.cfg.slots.length - 1];
           if (!last.role || last.role.trim() === '') {
             const synthRole = ROLE_TEMPLATES.find(r => r.id === 'synthesizer');
@@ -2955,7 +3002,7 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
         }
         save();
         closeTemplatesDrawer();
-        const notice = `✅ Template "${tpl.name}" applied! Preamble updated. Now send a prompt.`;
+        const notice = `✅ Template "${tpl.name}" applied! Preamble and roles updated. Now send a prompt.`;
         openSetup(notice);
       });
     
