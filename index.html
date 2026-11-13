@@ -1096,6 +1096,41 @@
     </div>
   </div>
 
+  <!-- Templates Drawer -->
+  <div class="overlay left-drawer" id="templatesOverlay">
+    <div class="drawer" role="dialog" aria-label="Templates">
+      <div class="row" style="display:flex;align-items:center;">
+        <h2>🎯 Templates</h2>
+        <span class="spacer"></span>
+        <button class="btn" id="btnCloseTemplates">✕</button>
+      </div>
+      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and sets the last slot's role to Synthesizer.</p>
+      <div id="templatesList"></div>
+    </div>
+  </div>
+
+  <!-- Batch Mode Modal -->
+  <div class="overlay" id="batchOverlay" style="justify-content:center;align-items:center;">
+    <div class="drawer" style="width:min(560px,94vw);height:auto;max-height:80vh;border-radius:12px;border:1px solid var(--line)">
+      <div class="row" style="display:flex;align-items:center;">
+        <h2>⚡ Batch Mode</h2>
+        <span class="spacer"></span>
+        <button class="btn" id="btnCloseBatch">✕</button>
+      </div>
+      <p class="hint" style="margin:4px 0 10px">Paste one prompt per line. Roundtable will run the full lineup on each prompt in sequence and collect synthesizer artifacts into a downloadable <code>.jsonl</code> file.</p>
+      <div class="field">
+        <label for="batchPrompts">Prompts (one per line)</label>
+        <textarea class="t" id="batchPrompts" style="min-height:160px" placeholder="Write a Python function that reverses a string&#10;Explain what a REST API is&#10;What is the difference between a list and a tuple?"></textarea>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn primary" id="btnRunBatch">▶️ Run Batch</button>
+        <span id="batchProgress" style="font-size:13px;color:var(--muted)"></span>
+        <span class="spacer"></span>
+        <button class="btn" id="btnDownloadBatch" disabled>⬇️ Download .jsonl</button>
+      </div>
+    </div>
+  </div>
+
   <script>
 // Official Tauri v2 HTTP Plugin Client & Global fetch Interceptor
 var __TAURI_PLUGIN_HTTP__ = (function() {
@@ -3118,40 +3153,6 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
     
         })();
   </script>
-  <!-- Templates Drawer -->
-  <div class="overlay left-drawer" id="templatesOverlay">
-    <div class="drawer" role="dialog" aria-label="Templates">
-      <div class="row" style="display:flex;align-items:center;">
-        <h2>🎯 Templates</h2>
-        <span class="spacer"></span>
-        <button class="btn" id="btnCloseTemplates">✕</button>
-      </div>
-      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and sets the last slot's role to Synthesizer.</p>
-      <div id="templatesList"></div>
-    </div>
-  </div>
-
-  <!-- Batch Mode Modal -->
-  <div class="overlay" id="batchOverlay" style="justify-content:center;align-items:center;">
-    <div class="drawer" style="width:min(560px,94vw);height:auto;max-height:80vh;border-radius:12px;border:1px solid var(--line)">
-      <div class="row" style="display:flex;align-items:center;">
-        <h2>⚡ Batch Mode</h2>
-        <span class="spacer"></span>
-        <button class="btn" id="btnCloseBatch">✕</button>
-      </div>
-      <p class="hint" style="margin:4px 0 10px">Paste one prompt per line. Roundtable will run the full lineup on each prompt in sequence and collect synthesizer artifacts into a downloadable <code>.jsonl</code> file.</p>
-      <div class="field">
-        <label for="batchPrompts">Prompts (one per line)</label>
-        <textarea class="t" id="batchPrompts" style="min-height:160px" placeholder="Write a Python function that reverses a string&#10;Explain what a REST API is&#10;What is the difference between a list and a tuple?"></textarea>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;">
-        <button class="btn primary" id="btnRunBatch">▶️ Run Batch</button>
-        <span id="batchProgress" style="font-size:13px;color:var(--muted)"></span>
-        <span class="spacer"></span>
-        <button class="btn" id="btnDownloadBatch" disabled>⬇️ Download .jsonl</button>
-      </div>
-    </div>
-  </div>
 
 </body>
 
