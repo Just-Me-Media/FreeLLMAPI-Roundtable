@@ -1,6 +1,6 @@
 /**
  * Roundtable Storage Architecture Entry Point
- * 
+ *
  * This module provides the modern storage layer for Roundtable,
  * replacing the legacy localStorage approach with:
  * - Atomic operations with transaction support
@@ -15,11 +15,15 @@ import { ConfigManager } from './storage/ConfigManager.js';
 import { ChatManager } from './storage/ChatManager.js';
 import { ArtifactManager } from './storage/ArtifactManager.js';
 import { SyncManager } from './storage/SyncManager.js';
+import { MigrationManager } from './storage/MigrationManager.js';
+import { StorageFactory } from './storage/StorageFactory.js';
 
 export {
   PersistentStorage,
   ConfigManager,
   ChatManager,
   ArtifactManager,
-  SyncManager
+  SyncManager,
+  MigrationManager,
+  StorageFactory
 };

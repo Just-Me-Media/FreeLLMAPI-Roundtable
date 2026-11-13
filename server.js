@@ -54,11 +54,14 @@ const json = (res, code, obj) => {
   res.end(JSON.stringify(obj));
 };
 
-// CORS: only the desktop app's own webview origins may read responses.
+// CORS: allow same-origin and localhost for testing
 const ALLOWED_ORIGINS = new Set(['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost']);
 function cors(req, res) {
   const o = req.headers.origin;
-  if (!o || !ALLOWED_ORIGINS.has(o)) return;
+  // Allow if no origin, Tauri origins, or localhost origins (for testing)
+  const isLocalhostOrigin = o && o.startsWith('http://localhost:');
+  const isTauriOrigin = ALLOWED_ORIGINS.has(o);
+  if (!o || (!isLocalhostOrigin && !isTauriOrigin)) return;
   res.setHeader('Access-Control-Allow-Origin', o);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');

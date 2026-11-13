@@ -4,7 +4,7 @@
   "version": "0.2.0",
   "identifier": "media.justme.roundtable",
   "build": {
-    "beforeBuildCommand": "mkdir -p dist && cp index.html dist/",
+    "beforeBuildCommand": "mkdir -p dist && cp index.html dist/ && cp -r src dist/",
     "frontendDist": "../dist"
   },
   "app": {

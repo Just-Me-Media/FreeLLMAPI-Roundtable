@@ -1131,6 +1131,34 @@
     </div>
   </div>
 
+  <script type="module">
+    // Storage architecture initialization
+    import { StorageFactory } from './src/index.js';
+
+    async function initializeStorage() {
+      try {
+        const { storage, configManager, chatManager, artifactManager, syncManager } = await StorageFactory.initialize();
+
+        window.storage = {
+          storage,
+          configManager,
+          chatManager,
+          artifactManager,
+          syncManager
+        };
+
+        console.log('[Storage Integration] Storage architecture initialized successfully');
+      } catch (error) {
+        console.error('[Storage Integration] Failed to initialize storage:', error);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeStorage);
+    } else {
+      initializeStorage();
+    }
+  </script>
   <script>
 // Official Tauri v2 HTTP Plugin Client & Global fetch Interceptor
 var __TAURI_PLUGIN_HTTP__ = (function() {
