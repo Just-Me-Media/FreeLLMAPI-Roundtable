@@ -1104,7 +1104,7 @@
         <span class="spacer"></span>
         <button class="btn" id="btnCloseTemplates">✕</button>
       </div>
-      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and assigns template-specific roles to each model slot (slot 1 = drafter/outline, slot 2 = critic, last = synthesizer).</p>
+      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and assigns template-specific roles to each model slot. Each slot gets its own role; extra slots cycle through the template roles.</p>
       <div id="templatesList"></div>
     </div>
   </div>
@@ -1339,6 +1339,10 @@ try {
         { id: 'outline', label: 'Draft initial outline', value: 'You are responsible for drafting the initial high-level outline and structure. Identify key components and logical flow before detailed implementation.' },
         { id: 'critique', label: 'Critique and find flaws', value: 'You are the critical reviewer. Identify weaknesses, potential bugs, edge cases, and logical flaws in the proposals. Be thorough and constructive in your critique.' },
         { id: 'brainstorm', label: 'Brainstorm ideas', value: 'You are the creative brainstormer. Generate multiple diverse approaches, alternative solutions, and novel ideas without worrying about implementation details.' },
+        { id: 'ceo', label: 'CEO (Business Strategy)', value: 'You are the CEO. You set the high-level vision, define core objectives, ensure alignment with long-term business goals, and make final decisions on strategic direction. You focus on market impact and overall value.' },
+        { id: 'coo', label: 'COO (Operational Focus)', value: 'You are the COO. You focus on operational efficiency, execution, processes, scalability, and day-to-day management. You identify practical hurdles and streamline workflows to achieve the goals.' },
+        { id: 'cfo', label: 'CFO (Financial/Resource)', value: 'You are the CFO. You manage financial health, resource allocation, cost efficiency, and risk assessment. You ensure projects are fiscally responsible, sustainable, and provide clear ROI.' },
+        { id: 'cto', label: 'CTO (Technology/Stack)', value: 'You are the CTO. You define the technical architecture, choose the tech stack, ensure code quality, evaluate technical debt, and ensure the chosen technology supports the business objectives.' },
         { id: 'summarize', label: 'Summarize key points', value: 'You are the summarizer. Distill the discussion into clear, concise summaries of key decisions, action items, and critical insights.' },
         { id: 'factcheck', label: 'Fact checker', value: 'You are the fact checker. Verify claims, check for accuracy, and ensure all statements are grounded in reality and technical feasibility.' },
         { id: 'experiment', label: 'Experiment with approaches', value: 'You are the experimenter. Try different approaches, explore edge cases, and test assumptions with practical examples.' },
@@ -2174,11 +2178,11 @@ try {
           const hit = all.find(m => opts.some(o => norm(m).includes(o)));
           if (hit && !next.includes(hit)) next.push(hit);
         }
-        if (!next.length) next.push(...all.slice(0, 3));
-        // Assign roles: slot 1 = outline/drafter, slot 2 = critique, last = synthesizer
-        const quickRoles = ['outline', 'critique', 'synthesizer'];
+        if (!next.length) next.push(...all.slice(0, 4));
+        // Assign roles: slot 1 = outline/drafter, slot 2 = critique, slot 3 = synthesizer, slot 4 = brainstorm
+        const quickRoles = ['outline', 'critique', 'synthesizer', 'brainstorm'];
         S.cfg.slots = next.map((m, i) => {
-          const roleDef = quickRoles[i] || quickRoles[quickRoles.length - 1];
+          const roleDef = quickRoles[i % quickRoles.length];
           const roleObj = ROLE_TEMPLATES.find(r => r.id === roleDef);
           return { id: nid(), model: m, name: shortName(m), role: roleObj ? roleObj.value : '' };
         });
@@ -2959,6 +2963,13 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       // ---------- Templates Drawer ----------
       const TEMPLATES = [
         { 
+          id: 'executive_board', 
+          name: '🏢 Executive Board', 
+          desc: 'Business strategy with CEO, COO, CFO, and CTO perspectives.',
+          preamble: 'You are an executive board collaborating on a business strategy question. Each member brings their area of expertise: the CEO sets strategic vision and alignment, the COO focuses on execution and operations, the CFO manages financial health and resource allocation, and the CTO defines technical architecture and feasibility. Work together to produce a comprehensive business strategy with clear action items and owners.',
+          roles: ['ceo', 'coo', 'cfo', 'cto']
+        },
+        { 
           id: 'skill_writer', 
           name: '📝 Skill Writer', 
           desc: 'Produce a reusable SKILL.md file for AI assistants.',
@@ -3013,10 +3024,10 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
         const tpl = TEMPLATES.find(t => t.id === btn.dataset.tpl); if (!tpl) return;
         S.cfg.preamble = tpl.preamble;
         $('preamble').value = tpl.preamble;
-        // Assign template-specific roles to each slot (slot 0 = first role, last = synthesizer)
+        // Assign template-specific roles to each slot (cycle through roles if more slots than roles)
         if (S.cfg.slots.length > 0 && tpl.roles && tpl.roles.length) {
           S.cfg.slots.forEach((slot, i) => {
-            const roleDef = tpl.roles[i] || tpl.roles[tpl.roles.length - 1];
+            const roleDef = tpl.roles[i % tpl.roles.length];
             const roleObj = ROLE_TEMPLATES.find(r => r.id === roleDef);
             if (roleObj) slot.role = roleObj.value;
           });
