@@ -53,7 +53,18 @@ const server = http.createServer((req, res) => {
         Connection: 'keep-alive',
       });
 
-      const chunks = [
+      // First reply: a single markdown artifact (existing behaviour).
+      // Second reply: multiple distinct artifacts from one synthesizer
+      // response (markdown + json + html) — exercises multi-artifact capture.
+      // Detect second synthesizer turn: second user prompt in the conversation.
+      const userMessages = (request.messages || []).filter(m => m.role === 'user');
+      const isSecond = userMessages.length === 2 && userMessages[userMessages.length - 1].content.includes('Second prompt');
+      const chunks = isSecond ? [
+        'Here are the requested artifacts:\n\n',
+        '```markdown\n# Multi artifact\n- Markdown block from one reply.\n```\n\n',
+        '```json\n[\n  {"instruction": "hello", "input": "", "response": "world"}\n]\n```\n\n',
+        '```html\n<div>Hello</div>\n```\n',
+      ] : [
         'Here is the requested artifact:\n\n```mark',
         'down\n# Smoke artifact\n- Streamed response rendered.\n',
         '- Artifact extracted and displayed.\n- Literal markup stays text: <img src=x onerror=alert(1)>\n```\n',

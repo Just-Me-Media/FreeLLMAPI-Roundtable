@@ -133,11 +133,30 @@ async function run() {
       20000
     );
 
+    // Second synthesizer reply yields 3 distinct artifacts (md/json/html) on top
+// of the first one, so the version strip must show 4 entries total.
+// Wait for the second synthesizer reply and verify the multi-artifact capture.
+// The mock returns a multi-fenced response (md+json+html) on the second user prompt.
+    await waitForCondition(
+      page,
+      () => document.querySelectorAll('#artifactVersionStrip [data-artifact-v]').length >= 4,
+      'Second synthesizer reply did not produce multi-artifact',
+      20000
+    );
     const artifactVersions = await page.locator('#artifactVersionStrip [data-artifact-v]').count();
-    if (artifactVersions !== 1) {
-      throw new Error(`Duplicate identical artifacts should be ignored; found ${artifactVersions} versions`);
+    const ah = await page.evaluate(() => (window.__ARTIFACT_HISTORY__ || []).map(a => a && a.lang));
+    if (artifactVersions !== 4) {
+      throw new Error(`Multi-artifact capture should produce 4 versions (1 from first reply + md/json/html from second); found ${artifactVersions}. Mock output: ${mock.testOutput()}`);
     }
-    console.log('Second response rendered; duplicate artifact was not added.');
+    const langs = await page.locator('#artifactVersionStrip [data-artifact-v] small').evaluateAll(el => el.map(e => e.textContent.trim()));
+    const expectedLangs = ['markdown', 'markdown', 'json', 'html'];
+    if (langs.join(',') !== expectedLangs.join(',')) {
+      throw new Error(`Version strip language indicators were ${JSON.stringify(langs)}, expected ${JSON.stringify(expectedLangs)}`);
+    }
+    // Each artifact should be individually selectable and exportable.
+    const exportBtn = page.locator('#btnSmartExport');
+    if (!(await exportBtn.isVisible())) throw new Error('Export button missing after multi-artifact capture');
+    console.log('Second response rendered; 3 distinct artifacts captured with language indicators.');
   } finally {
     await browser.close();
     stopChildren();
