@@ -108,20 +108,25 @@ Then select either model inside OpenCode:
 
 Both models are registered in `~/.config/opencode/opencode.jsonc` under the `freellmapi` provider.
 
-To rebuild the launcher (e.g. if Desktop icon is lost):
+#### Rebuild the launcher
+
+The AppleScript source is now committed to the repo at `scripts/consensus.applescript`.
+To rebuild the .app:
+
 ```bash
-# Paste into Terminal
-osacompile -o ~/Desktop/"OpenCode Consensus.app" /tmp/consensus.applescript
+osacompile -o ~/Desktop/"OpenCode Consensus.app" scripts/consensus.applescript
 cp /Applications/OpenCode.app/Contents/Resources/icon.icns ~/Desktop/"OpenCode Consensus.app"/Contents/Resources/applet.icns
 ```
 
-The source script is at `/tmp/consensus.applescript` (ephemeral — recreate from HANDOFF if needed):
-```applescript
-on run
-    do shell script "export PATH=/opt/homebrew/bin:$HOME/.local/bin:$PATH; if ! pgrep -f FreeLLMAPI >/dev/null 2>&1; then open -a /Applications/FreeLLMAPI.app; sleep 3; fi; open -a /Applications/OpenCode.app"
-end run
-```
+## Roundtable → OpenCode Export
+
+Click **🚀 Export to OpenCode** in the artifact pane to copy a ready-to-run prompt built
+from the current synthesized artifact and your lineup. Paste into OpenCode — no retyping.
+Deliberate in Roundtable, then hand the converged plan to OpenCode to build websites,
+PDFs, repos, or apps using the same FreeLLMAPI backend.
 
 ## Links
+- `build-windows.ps1` — one-step Windows builder (syncs `dist/`, runs `cargo tauri build`)
+- `Roundtable-Windows-Start.bat` — post-build launcher (checks FreeLLMAPI, starts proxy, runs app)
+- `scripts/consensus.applescript` — OpenCode Consensus desktop launcher source
 - CROSS_MACHINE_SYNC.md — sync protocol for Mac/Windows
-- `build-windows.ps1` — one-step Windows builder

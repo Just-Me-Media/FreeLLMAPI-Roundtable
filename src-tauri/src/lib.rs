@@ -11,14 +11,28 @@ fn safe_file_name(name: &str) -> Result<&str, String> {
   if bad { Err("Invalid file name".to_string()) } else { Ok(n) }
 }
 
-/// Save artifact content to the user's Documents/Roundtable folder.
+/// Save artifact content.
+///
+/// `folder` (optional): the directory returned by the native Save-As dialog.
+/// When provided, the file is written there (the folder is trusted — the user
+/// chose it). When omitted, the file falls back to Documents/Roundtable.
+/// In both cases the *file name* itself is sanitized against path traversal.
 #[tauri::command]
-fn save_artifact_file(app: tauri::AppHandle, name: String, content: String) -> Result<String, String> {
+fn save_artifact_file(app: tauri::AppHandle, name: String, content: String, folder: Option<String>) -> Result<String, String> {
   let name = safe_file_name(&name)?;
-  let docs = app.path().document_dir().map_err(|e| e.to_string())?
-    .join("Roundtable");
-  std::fs::create_dir_all(&docs).map_err(|e| e.to_string())?;
-  let path = docs.join(name);
+  let dir: std::path::PathBuf = if let Some(folder) = folder {
+    // User-chosen folder — trust it, but normalize and validate it exists.
+    let f = std::path::PathBuf::from(&folder);
+    if !f.is_dir() {
+      return Err(format!("Chosen folder does not exist or is not a directory: {}", folder));
+    }
+    f
+  } else {
+    app.path().document_dir().map_err(|e| e.to_string())?
+      .join("Roundtable")
+  };
+  std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+  let path = dir.join(name);
   std::fs::write(&path, content).map_err(|e| e.to_string())?;
   Ok(path.to_string_lossy().into_owned())
 }

@@ -122,11 +122,24 @@ npm run verify
 ./scripts/build-and-notarize.sh
 ```
 
-### Windows (.exe)
-Built natively via your Windows build machine (or ThinkCentre runner):
+### Windows (.exe / .msi)
+Built natively on your Windows machine (ThinkCentre). The one-step builder syncs the
+frontend, runs the Tauri build, and lists the produced installers:
+
 ```powershell
-cargo tauri build
+# From the repo root:
+powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
+
+After the build, launch the app with its dependencies (FreeLLMAPI + local proxy):
+
+```powershell
+# Double-click, or:
+powershell -ExecutionPolicy Bypass -File .\Roundtable-Windows-Start.bat
+```
+
+**Prerequisites on the Windows machine:** Rust toolchain (`cargo`), Node.js 18+,
+`cargo-tauri` (`cargo install tauri-cli`), and FreeLLMAPI running on `localhost:31415`.
 
 ---
 

@@ -916,6 +916,7 @@
             <button class="btn" id="btnSaveArtifactFile" style="font-size:11px;padding:3px 8px">⬇️ Save As…</button>
             <button class="btn" id="btnSaveArtifactHistory" style="font-size:11px;padding:3px 8px">🗂️ Versions</button>
             <button class="btn danger" id="btnResetArtifactHistory" style="font-size:11px;padding:3px 8px">🗑️ Reset</button>
+            <button class="btn" id="btnExportOpenCode" style="font-size:11px;padding:3px 8px" title="Copy a ready-to-run OpenCode prompt built from this artifact + lineup">🚀 Export to OpenCode</button>
           </div>
         </div>
       </div>
@@ -2174,6 +2175,32 @@ try {
         renderChatsList();
       }
 
+      // Save the current artifact to a file (same logic as the "Save As…" button).
+      async function saveCurrentArtifactFile() {
+        if (artifactCurrentIdx < 0) return;
+        const { lang, text } = artifactHistory[artifactCurrentIdx];
+        const ext = (lang === 'markdown' || lang === 'md') ? 'md' : lang || 'txt';
+        const isTauri = () => window.__rtIsTauri();
+        if (isTauri()) {
+          try {
+            const { save } = await window.__TAURI__.dialog;
+            const path = await save({ defaultPath: `artifact.${ext}`, filters: [{ name: 'Artifact', extensions: [ext] }] });
+            if (!path) return;
+            const { invoke } = await window.__TAURI__.core;
+            const folder = path.replace(/[/\\][^/\\]+$/, '');
+            await invoke('save_artifact_file', { name: path.split('/').pop(), content: text, folder });
+            const b = $('btnSaveArtifactFile');
+            if (b) { b.textContent = '\u2705 Saved'; setTimeout(() => b.textContent = '\u2B07\uFE0F Save As…', 2000); }
+          } catch (e) { alert('Save failed: ' + e.message); }
+        } else {
+          const name = prompt('Save artifact as:', `artifact.${ext}`) || `artifact.${ext}`;
+          const blob = new Blob([text], { type: 'text/plain' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob); a.download = name; a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        }
+      }
+
       $('chatsList').onclick = e => {
         const delBtn = e.target.closest('[data-del-chat]');
         if (delBtn) {
@@ -2232,9 +2259,31 @@ try {
       $('btnClose').onclick = closeSetup;
       $('overlay').addEventListener('mousedown', e => { if (e.target.id === 'overlay') closeSetup(); });
       $('btnExport').onclick = exportMd;
+
+      // ---------- Modal dialog helpers ----------
+      async function modalConfirm(message, title = 'Confirm') {
+        if (window.__TAURI__) {
+          try {
+            const { confirm } = window.__TAURI__.dialog || {};
+            if (confirm) return await confirm(message, { title });
+          } catch (e) { console.warn('Tauri dialog confirm failed:', e); }
+        }
+        return confirm(message, title) ?? false;
+      }
+
+      async function modalAlert(message, title = 'Alert') {
+        if (window.__TAURI__) {
+          try {
+            const { message: tauiMessage } = window.__TAURI__.dialog || {};
+            if (tauiMessage) { return await tauiMessage(message, { title }); }
+          } catch (e) { console.warn('Tauri dialog message failed:', e); }
+        }
+        alert(message);
+      }
+
       // ---------- App Updates (Tauri updater) ----------
-let updateBusy = false;
-async function checkAndUpdate() {
+      let updateBusy = false;
+      async function checkAndUpdate() {
   if (updateBusy) return;
   if (!window.__TAURI__) {
     await modalAlert('App updates are only available inside the Roundtable desktop app. Run it from Applications or the installer.', 'No Tauri runtime');
@@ -2288,6 +2337,16 @@ $('btnClear').onclick = async () => {
           );
           if (saveFirst) {
             saveCurrentChat();
+            // Also offer to save the current synthesized artifact (if any)
+            if (artifactCurrentIdx >= 0 && artifactHistory[artifactCurrentIdx]) {
+              const saveArtifact = await modalConfirm(
+                'Save Synthesized Artifact?',
+                'A synthesized artifact is available. Save it as a file too?'
+              );
+              if (saveArtifact) {
+                await saveCurrentArtifactFile();
+              }
+            }
           } else {
             const discard = await modalConfirm(
               'Discard Chat?',
@@ -2441,10 +2500,24 @@ $('btnClear').onclick = async () => {
       // Migrate stale config: if the saved freellmUrl points to the old Vite dev
       // server (port 5173) or any non-FreeLLMAPI port, reset it to the correct
       // FreeLLMAPI default so the app doesn't show "offline" on first launch.
-      if (S.cfg.freellmUrl && /:(5173|3000|8080|8000)\/?$/.test(S.cfg.freellmUrl)) {
-        console.warn('[boot] Stale freellmUrl detected (' + S.cfg.freellmUrl + '), resetting to 31415.');
-        S.cfg.freellmUrl = 'http://127.0.0.1:31415';
-        save();
+      // Known stale ports: 5173 (Vite dev), 3000/8080/8000 (old dev servers).
+      const STALE_PORTS = [5173, 3000, 8080, 8000];
+      let staleUrl = S.cfg.freellmUrl;
+      if (staleUrl) {
+        try {
+          const u = new URL(staleUrl);
+          const port = Number(u.port) || (u.protocol === 'https:' ? 443 : 80);
+          if (STALE_PORTS.includes(port)) {
+            console.warn('[boot] Stale freellmUrl detected (' + staleUrl + '), resetting to 31415.');
+            S.cfg.freellmUrl = 'http://127.0.0.1:31415';
+            save();
+          }
+        } catch (e) {
+          // Malformed URL — fall back to default below
+          console.warn('[boot] Malformed freellmUrl detected (' + staleUrl + '), resetting to 31415.');
+          S.cfg.freellmUrl = 'http://127.0.0.1:31415';
+          save();
+        }
       }
       const savedMsgs = store.get('rt.msgs');
       if (Array.isArray(savedMsgs)) {
@@ -2670,7 +2743,10 @@ $('btnClear').onclick = async () => {
         const path = await save({ defaultPath: `artifact.${ext}`, filters: [{ name: 'Artifact', extensions: [ext] }] });
         if (!path) return;
         const { invoke } = await window.__TAURI__.core;
-        await invoke('save_artifact_file', { name: path.split(/[\\/]/).pop(), content: text });
+        // Pass the chosen folder so the file lands where the user picked, not
+        // always Documents/Roundtable.
+        const folder = path.replace(/[\\/\\][^\\/\\]+$/, '');
+        await invoke('save_artifact_file', { name: path.split(/[\\/\\]/).pop(), content: text, folder });
         const b=$('btnSaveArtifactFile'); b.textContent='\u2705 Saved';
         setTimeout(()=>b.textContent='\u2B07\uFE0F Save As…',2000);
       } catch(e) { alert('Save failed: '+e.message); }
@@ -2684,6 +2760,43 @@ $('btnClear').onclick = async () => {
     if (!confirm('Clear all artifact versions?')) return;
     artifactHistory=[]; artifactCurrentIdx=-1; artifactDiffOpen=false;
     localStorage.removeItem('rt.artifactHistory'); refreshArtifactPane();
+  };
+
+  // Export the current artifact + lineup as a ready-to-run OpenCode prompt.
+  // Deliberation (Roundtable) → execution (OpenCode), same FreeLLMAPI backend.
+  $('btnExportOpenCode').onclick = () => {
+    const art = artifactCurrentIdx >= 0 ? artifactHistory[artifactCurrentIdx] : null;
+    const lineup = S.lineup || [];
+    const names = lineup.map(m => m.name || m.model || 'model').join(', ');
+    const roles = lineup.map(m => m.role || 'draft').join(' → ');
+    const prompt = [
+      'You are building on a consensus reached by a roundtable of AI models.',
+      '',
+      '## Deliberation context',
+      'Lineup: ' + names,
+      'Roles:   ' + roles,
+      '',
+      art && art.text ? ('## Synthesized artifact (' + (art.lang || 'text') + ')\n' + art.text) : '## Synthesized artifact',
+      '',
+      '## Task',
+      'Implement exactly what the synthesized artifact describes. If it is code,',
+      'create the files it specifies. If it is a plan, turn it into working software.',
+      'If it is a document, produce the final file (e.g. .pdf, .md) it asks for.',
+      'Use the freellmapi/fusion model for multi-model synthesis, or',
+      'freellmapi/auto:free-coding for a coding pipeline.',
+      '',
+      'Do not re-deliberate — the roundtable already converged. Build it.',
+    ].join('\n');
+    // Copy to clipboard and give feedback
+    navigator.clipboard.writeText(prompt).then(() => {
+      const b = $('btnExportOpenCode');
+      const saved = b.textContent;
+      b.textContent = '\u2705 Copied! Open OpenCode & paste';
+      setTimeout(() => b.textContent = saved, 2200);
+    }).catch(() => {
+      // Fallback: show in a prompt so the user can copy manually
+      window.prompt('Copy this prompt and paste it into OpenCode:', prompt);
+    });
   };
 
   function switchPreviewTab(tab) {
@@ -2700,7 +2813,14 @@ $('btnClear').onclick = async () => {
     persistKeyChk.checked = store.get('rt.persistKey') !== false;
     persistKeyChk.onchange = () => {
       store.set('rt.persistKey', persistKeyChk.checked);
-      if (!persistKeyChk.checked) { const c=store.get('rt.cfg')||{}; delete c.key; delete c.directKey; store.set('rt.cfg',c); }
+      if (!persistKeyChk.checked) {
+        const c = store.get('rt.cfg') || {};
+        delete c.key;
+        delete c.directKey;
+        store.set('rt.cfg', c);
+        // Also clear from in-memory S.cfg so this session stops sending them
+        if (S && S.cfg) { delete S.cfg.key; delete S.cfg.directKey; save(); }
+      }
     };
   }
 
