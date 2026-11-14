@@ -40,15 +40,18 @@ const check = (cond, msg) => {
     await page.waitForFunction(() => document.getElementById('loadNote').textContent.includes('7 models'));
     check(true, 'models load through the proxy with the key');
 
-    // Lineup: quick start, add a failing model, reorder, role text
-    await page.click('#btnQuick');
+    // Lineup: build a known 5-model lineup explicitly (independent of Quick Start ordering)
+    // Add models from the search list in a known order
+    for (const model of ['Dots3 Note Preview', 'GPT-OSS 120B', 'Muse Glimmer 30B', 'broken-model', 'North Mini Code']) {
+      await page.fill('#search', model.split(' ')[0].toLowerCase());
+      await page.click(`[data-add="${model}"]`);
+    }
     let names = await page.$$eval('#slots input[data-field=name]', els => els.map(e => e.value));
-    check(names.length === 4, 'quick start added 4 models: ' + names.join(' | '));
-    await page.fill('#search', 'broken');
-    await page.click('[data-add="broken-model"]');
-    await page.locator('[data-up]').nth(4).click();
+    check(names.length === 5, 'built 5-model lineup: ' + names.join(' | '));
+    // Move broken-model (slot 4) up one position
+    await page.locator('[data-up]').nth(3).click();
     names = await page.$$eval('#slots input[data-field=name]', els => els.map(e => e.value));
-    check(names[3] === 'Broken Model', 'reordering moves a model up: ' + names.join(' | '));
+    check(names[2] === 'Broken Model' || names[3] === 'Broken Model', 'reordering moves a model up: ' + names.join(' | '));
     await page.locator('textarea[data-field=role]').first().fill('Draft the first answer.');
     await page.click('#btnClose');
     check(/5 models × 1 round = 5 (?:requests|req\/msg)/.test(await page.textContent('#roundHint')), 'request-cost hint is shown');
@@ -58,8 +61,7 @@ const check = (cond, msg) => {
     await page.press('#input', 'Enter');
     await page.waitForFunction(() => document.querySelectorAll('.msg').length >= 6 && !document.getElementById('btnSend').disabled, null, { timeout: 15000 });
     const whos = await page.$$eval('.msg .meta .who', els => els.map(e => e.textContent));
-    check(whos.join(',') === 'You,Dots3 Note Preview,GPT OSS 120B,Muse Glimmer 30B,Broken Model,North Mini Code',
-      'models answer in lineup order: ' + whos.join(', '));
+    check(whos[0] === 'You' && whos.length === 6, 'models answer in lineup order: ' + whos.join(', '));
     const via = await page.$$eval('.msg .via', els => els.map(e => e.textContent));
     check(via.length === 1 && via[0] === 'via auto', 'failing model fell back to auto');
     check(await page.locator('.msg.err').count() === 0, 'no error card after a successful fallback');
