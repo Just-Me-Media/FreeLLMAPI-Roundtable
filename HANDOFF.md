@@ -10,28 +10,24 @@
   - Storage architecture (`src/storage/*`) bundled inside the app.
   - Updater signing key: `6E8C99D71D9B2B5A` (same key baked into both configs).
 
-- **Windows Build (ThinkCentre):** ✅ **Built, installed, and verified for 0.2.1.**
-  - Built from `main` (9f7c7fe — the `feat/storage-rewrite` tip plus the Windows path/script fixes) with `build-windows.ps1` — no GitHub Actions minutes used.
-  - NSIS installer: `src-tauri/target/release/bundle/nsis/Roundtable_0.2.1_x64-setup.exe`
-  - MSI: `src-tauri/target/release/bundle/msi/Roundtable_0.2.1_x64_en-US.msi`
-  - Staged copies: `C:\Temp\Roundtable\Roundtable-Windows-x64-v0.2.1.exe` / `.msi`
-  - Installed on the ThinkCentre; `app.exe` reports file/product version `0.2.1`.
-  - Verified via WebView2 remote debugging (port 9222):
-    - App launches; window titled `Roundtable`.
-    - All storage modules load over `http://tauri.localhost/` (`src/index.js` + 7 modules, HTTP 200) and `window.storage` is initialised — the `dist/src/` copy fix works.
-    - FreeLLMAPI `/api/ping` returns 200 → `FreeLLMAPI connected (http://127.0.0.1:31415)`.
-    - "Load FreeLLMAPI Models" loaded 385 models.
-    - Artifact "Save As…" wrote `my-artifact.md` into the folder picked in the native dialog (not Documents/Roundtable).
-    - Updater `check()` reaches `releases/latest/download/updates.json` and returns `null` (the app is already on 0.2.1).
-    - Turn Rules tab is the default active tab; prompt textarea `min-height` is 120px.
+- **Windows Build:** ✅ **Built by CI, installed, and verified for 0.2.1.**
+  - Built by the `Release Windows` workflow (run `43558939733`, 5m56s, `windows-latest`) from tag `v0.2.1` at `a858903`, using the same `build-windows.ps1` the ThinkCentre uses.
+  - NSIS installer: 4,298,813 bytes — SHA-256 `775356C5D68C1A7623EB1817138750BBF30A454F71B90928083DDF1F03E7AAF6`
+  - MSI: 6,410,240 bytes
+  - Installed on the ThinkCentre; `app.exe` reports file/product version `0.2.1` (18,918,912 bytes).
+  - Verified on that installed build via WebView2 remote debugging (port 9222):
+    - All storage modules load over `http://tauri.localhost/` (`src/index.js` + 7 modules, HTTP 200); `window.storage` initialised with all five managers.
+    - `FreeLLMAPI connected (http://127.0.0.1:31415)`; "Load FreeLLMAPI Models" loaded 399 models.
+    - Artifact "Save As…" wrote `ci-artifact.md` into the folder picked in the native dialog; `Documents\Roundtable` stayed empty.
+    - Updater `check()` returns `null` without error (already on 0.2.1).
+    - Turn Rules is the default active tab; prompt textarea `min-height` is 120px.
   - `cargo test` passes (2 Rust tests for safe artifact filenames).
 
 - **Windows release status:** ✅ **Published on `v0.2.1`.**
-  - Assets: `Roundtable_0.2.1_x64-setup.exe` (4,317,243 bytes) and `Roundtable_0.2.1_x64_en-US.msi` (6,434,816 bytes).
-  - The release's `updates.json` now carries **both** `darwin-aarch64` and `windows-x86_64`, signed with key id `6E8C99D71D9B2B5A`.
+  - Assets: `Roundtable_0.2.1_x64-setup.exe` and `Roundtable_0.2.1_x64_en-US.msi`.
+  - The release's `updates.json` carries **both** `darwin-aarch64` and `windows-x86_64`, signed with key id `6E8C99D71D9B2B5A`.
   - Signature verified out-of-band against the pubkey baked into `src-tauri/tauri.conf.json`: minisign prehashed mode (`ED`), BLAKE2b-512 over the installer, key id matches. This is the exact check the updater performs on download.
-  - The published installer is byte-identical to the locally built and tested one (SHA-256 `456BF28B02E66BC5B6AAFF666D5E26C9C44EA13AD74360F9D6609B4A9465B873`).
-  - In-app `updater.check()` returns `null` without error (app is already 0.2.1), so the endpoint is live and the manifest parses.
+  - Tag `v0.2.1` points at `a858903`, the exact commit the workflow built.
 
   **Release process (one path, used locally and in CI):**
   1. Bump `version` in `src-tauri/tauri.conf.json` (and `package.json`), commit, push.
@@ -54,10 +50,12 @@
   - GitHub Actions minutes are free for public repositories, so this costs
     nothing.
 
-  **Key gotcha:** `src-tauri/updater.key` in this checkout is **stale**
-  (key id `13FADAED9706926B`) and does NOT match the pubkey baked into the app.
-  Never sign a release with it — the app would reject the update. The only valid
-  private key is the `TAURI_SIGNING_PRIVATE_KEY` repo secret.
+  **Signing key:** the only valid private key is the repo secret
+  `TAURI_SIGNING_PRIVATE_KEY` (key id `6E8C99D71D9B2B5A`). No key file lives in
+  the tree; `.gitignore` excludes `*.key` and `*.sig`. The stale
+  `src-tauri/updater.key` (key id `13FADAED9706926B`, not trusted by the app) was
+  removed and backed up to
+  `C:\Temp\Roundtable\stale-updater-13FADAED9706926B.key.bak`.
 
   **One-time migration:** the signing key was rotated in 0.2.1 (old key id
   `D2B0F1370F1F4C9D`). Builds of **0.2.0 and older will reject the 0.2.1 update**

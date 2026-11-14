@@ -3,13 +3,14 @@ name: Release Windows
 # Builds, signs and publishes the Windows desktop release.
 #
 # The release tag is DERIVED from src-tauri/tauri.conf.json, so a tag can never
-# disagree with the binaries inside it. Publish by dispatching against the tag:
+# disagree with the binaries inside it. Two ways to publish:
 #
-#   gh workflow run release.yml --ref v0.2.1
+#   git tag v0.2.1 && git push origin v0.2.1      # tag push publishes
+#   gh workflow run release.yml --ref v0.2.1      # or dispatch against the tag
 #
-# or against a branch whose version is not tagged yet (the tag is created at
-# that commit). Dispatching a branch whose tag already points at different code
-# fails on purpose.
+# Dispatching a branch also works while the version is not tagged yet (the tag
+# is created at that commit). Dispatching a branch whose tag already points at
+# different code fails on purpose.
 #
 # macOS is built and notarized locally (scripts/build-and-notarize.sh) and
 # publishes its own darwin-aarch64 entry. This job MERGES its windows-x86_64
@@ -21,6 +22,9 @@ name: Release Windows
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
