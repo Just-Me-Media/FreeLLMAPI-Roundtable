@@ -921,11 +921,9 @@
             <div style="position:relative;display:inline-block">
               <button class="btn" id="btnSmartExport" style="font-size:11px;padding:3px 8px" title="Export artifact as a specific output format">📦 Export As…</button>
               <div id="smartExportMenu" style="display:none;position:absolute;bottom:calc(100% + 4px);left:0;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:170px;z-index:200;overflow:hidden">
-                <button class="modelitem" data-export-as="skill" style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">📝 SKILL.md</button>
-                <button class="modelitem" data-export-as="jsonl" style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">🧠 LoRA .jsonl</button>
-                <button class="modelitem" data-export-as="promptpack" style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">📋 Prompt Pack .md</button>
-                <button class="modelitem" data-export-as="plugin" style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">🔌 Plugin ZIP</button>
-                <button class="modelitem" data-export-as="md" style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">📄 Markdown .md</button>
+                <button class="modelitem" data-export-as="md"   style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">📄 Markdown .md</button>
+                <button class="modelitem" data-export-as="html" style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">🌐 HTML file</button>
+                <button class="modelitem" data-export-as="txt"  style="width:100%;border:none;background:none;text-align:left;cursor:pointer;padding:8px 12px;font-size:12px;">📃 Plain text .txt</button>
               </div>
             </div>
           </div>
@@ -1128,7 +1126,7 @@
         <span class="spacer"></span>
         <button class="btn" id="btnCloseTemplates">✕</button>
       </div>
-      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and assigns template-specific roles to each model slot. Each slot gets its own role; extra slots cycle through the template roles.</p>
+      <p class="hint" style="margin:4px 0 10px">Pick a template to load a proven set of roles and focused instructions. Add your models first, then apply a template — it assigns roles in order and sets the shared preamble. Send a prompt to start.</p>
       <div id="templatesList"></div>
     </div>
   </div>
@@ -1350,36 +1348,30 @@ try {
       'use strict';
 
       const DEFAULT_PREAMBLE =
-        'You are one participant in a group conversation with a human and several other AI models. ' +
-        'Messages from other participants appear as "[Name]: text". Read them, build on good points, ' +
-        'push back where they are wrong, and do not repeat what has already been said. ' +
-        'Reply as yourself without prefixing your own name. Keep replies focused.';
+        'You are one participant in a roundtable with a human and several other AI models. ' +
+        'Earlier replies appear as "[Name]: text". Read them carefully, build on strong points, ' +
+        'challenge anything weak or wrong, and never repeat what has already been said well. ' +
+        'Reply as yourself — no name prefix. Be direct, specific, and genuinely useful.';
 
-      const QUICK = ['dots3', 'gpt-oss 120b|gpt-oss-120b', 'muse glimmer', 'north mini code|north-mini'];
+      // QUICK is intentionally unused — quickStart() now selects the first loaded models automatically.
 
       // ---------- role templates ----------
       const ROLE_TEMPLATES = [
-        { id: 'synthesizer', label: 'Synthesizer (extract code artifacts)', value: 'You are the synthesizer. Your task is to synthesize the previous responses into a final implementation. Output MUST be in code blocks with proper language identifiers (```javascript, ```python, etc.). Extract the best ideas from earlier models, merge them into coherent code, and present the final artifact as a fenced code block.' },
-        { id: 'outline', label: 'Draft initial outline', value: 'You are responsible for drafting the initial high-level outline and structure. Identify key components and logical flow before detailed implementation.' },
-        { id: 'critique', label: 'Critique and find flaws', value: 'You are the critical reviewer. Identify weaknesses, potential bugs, edge cases, and logical flaws in the proposals. Be thorough and constructive in your critique.' },
-        { id: 'brainstorm', label: 'Brainstorm ideas', value: 'You are the creative brainstormer. Generate multiple diverse approaches, alternative solutions, and novel ideas without worrying about implementation details.' },
-        { id: 'ceo', label: 'CEO (Business Strategy)', value: 'You are the CEO. You set the high-level vision, define core objectives, ensure alignment with long-term business goals, and make final decisions on strategic direction. You focus on market impact and overall value.' },
-        { id: 'coo', label: 'COO (Operational Focus)', value: 'You are the COO. You focus on operational efficiency, execution, processes, scalability, and day-to-day management. You identify practical hurdles and streamline workflows to achieve the goals.' },
-        { id: 'cfo', label: 'CFO (Financial/Resource)', value: 'You are the CFO. You manage financial health, resource allocation, cost efficiency, and risk assessment. You ensure projects are fiscally responsible, sustainable, and provide clear ROI.' },
-        { id: 'cto', label: 'CTO (Technology/Stack)', value: 'You are the CTO. You define the technical architecture, choose the tech stack, ensure code quality, evaluate technical debt, and ensure the chosen technology supports the business objectives.' },
-        { id: 'summarize', label: 'Summarize key points', value: 'You are the summarizer. Distill the discussion into clear, concise summaries of key decisions, action items, and critical insights.' },
-        { id: 'factcheck', label: 'Fact checker', value: 'You are the fact checker. Verify claims, check for accuracy, and ensure all statements are grounded in reality and technical feasibility.' },
-        { id: 'experiment', label: 'Experiment with approaches', value: 'You are the experimenter. Try different approaches, explore edge cases, and test assumptions with practical examples.' },
-        { id: 'user-focus', label: 'Focus on user needs', value: 'You are the user advocate. Ensure all solutions prioritize user experience, accessibility, and real-world usability. Challenge technical complexity that doesn\'t serve users.' },
-        { id: 'analyze', label: 'Analyze data patterns', value: 'You are the data analyst. Identify patterns, trends, and correlations in the responses. Find connections and synthesize insights from multiple viewpoints.' },
-        { id: 'devils-advocate', label: 'Devils advocate', value: 'You are the devil\'s advocate. Challenge assumptions, question consensus, and explore counter-arguments to ensure robust decision-making.' },
-        { id: 'architecture', label: 'Design system architecture', value: 'You are the architect. Design scalable, maintainable system designs with proper patterns, component relationships, and technology stack decisions.' },
-        { id: 'performance', label: 'Optimize performance', value: 'You are the performance engineer. Identify bottlenecks, optimize algorithms, improve resource usage, and ensure efficient execution.' },
-        { id: 'security', label: 'Analyze security implications', value: 'You are the security analyst. Identify vulnerabilities, security risks, and ensure robust protection mechanisms in the proposed solutions.' },
-        { id: 'testing', label: 'Design test strategies', value: 'You are the testing expert. Design comprehensive test cases, edge case coverage, and validation strategies for the implemented solution.' },
+        { id: 'writer',        label: '✍️ Writer — drafts clear, focused prose',                      value: 'You are the Writer. Produce a clear, well-structured first draft based on the prompt and any earlier input. Prioritise clarity and specificity over length. No filler.' },
+        { id: 'critic',        label: '🔎 Critic — challenges and finds gaps',                           value: 'You are the Critic. Identify the weakest claims, missing evidence, logical gaps, and anything that could mislead or confuse. Be direct and specific — vague praise is useless.' },
+        { id: 'researcher',    label: '📚 Researcher — grounds claims in evidence',                      value: 'You are the Researcher. Bring in relevant facts, context, examples, and counter-examples. Flag anything stated without evidence. Do not fabricate sources — acknowledge uncertainty honestly.' },
+        { id: 'editor',        label: '✏️ Editor — tightens and polishes',                             value: 'You are the Editor. Tighten the prose: cut redundancy, fix structure, improve clarity. Do not change the substance — only the expression.' },
+        { id: 'devil',         label: '😈 Devil’s Advocate — argues the other side',                value: "You are the Devil’s Advocate. Argue the strongest possible case against the current direction. Find the scenario where this plan fails, the assumption that is wrong, or the stakeholder who loses. Be genuinely adversarial, not performatively." },
+        { id: 'synthesizer',   label: '🔗 Synthesizer — produces the final document',                   value: 'You are the Synthesizer. Read everything said and produce the final, consolidated output the human asked for. Resolve disagreements by picking the strongest position. Output clean, complete markdown — this is the deliverable.' },
+        { id: 'strategist',    label: '🧭 Strategist — goals, tradeoffs, long game',                     value: 'You are the Strategist. Focus on what actually matters: the goal, the constraints, the tradeoffs, and the second-order effects. Push back on tactics that distract from the objective.' },
+        { id: 'expert',        label: '🎓 Domain Expert — applies deep knowledge',                       value: 'You are the Domain Expert. Apply specific, accurate knowledge to the problem. Correct misconceptions. Provide depth that a generalist would miss. If the topic is outside your reliable knowledge, say so clearly.' },
+        { id: 'user-advocate', label: '👤 User Advocate — keeps real people in view',                   value: "You are the User Advocate. Ask: who is this actually for, and does this serve them? Surface assumptions about the audience that haven’t been tested. Push back on complexity that real users won’t tolerate." },
+        { id: 'code-reviewer', label: '🐛 Code Reviewer — bugs, security, maintainability',             value: 'You are the Code Reviewer. Find bugs, security issues, edge cases, and maintainability problems. Suggest specific fixes, not general advice. If the code is good, say so and explain why.' },
+        { id: 'architect',     label: '🏗️ Architect — structure and design decisions',            value: 'You are the Architect. Focus on structure: component boundaries, data flow, failure modes, and scalability. Identify design decisions that will be hard to reverse later.' },
+        { id: 'teacher',       label: '🧑‍🏫 Teacher — explains clearly for the stated audience', value: 'You are the Teacher. Explain concepts in plain language appropriate for the audience stated in the prompt. Use concrete examples and analogies. Identify and address the most likely points of confusion.' },
       ];
 
-      // ---------- state ----------
+      
       const S = {
         cfg: {
           freellmUrl: 'http://127.0.0.1:31415',
@@ -2325,19 +2317,12 @@ try {
           alert('Please click "Load Models" in the Cloud tab or "Detect Local Models" in the Local tab first.');
           return;
         }
-        const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-        const next = [];
-        for (const want of QUICK) {
-          const opts = want.split('|').map(norm);
-          const hit = all.find(m => opts.some(o => norm(m).includes(o)));
-          if (hit && !next.includes(hit)) next.push(hit);
-        }
-        if (!next.length) next.push(...all.slice(0, 4));
-        // Assign roles: slot 1 = outline/drafter, slot 2 = critique, slot 3 = synthesizer, slot 4 = brainstorm
-        const quickRoles = ['outline', 'critique', 'synthesizer', 'brainstorm'];
-        S.cfg.slots = next.map((m, i) => {
-          const roleDef = quickRoles[i % quickRoles.length];
-          const roleObj = ROLE_TEMPLATES.find(r => r.id === roleDef);
+        // Pick up to 4 models in loaded order — no name matching needed
+        const picked = all.slice(0, Math.min(4, all.length));
+        // Default roles: writer → critic → synthesizer → strategist
+        const defaultRoles = ['writer', 'critic', 'synthesizer', 'strategist'];
+        S.cfg.slots = picked.map((m, i) => {
+          const roleObj = ROLE_TEMPLATES.find(r => r.id === defaultRoles[i % defaultRoles.length]);
           return { id: nid(), model: m, name: shortName(m), role: roleObj ? roleObj.value : '' };
         });
         renderSlots(); renderLineup(); save();
@@ -3129,61 +3114,124 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
     
       // ---------- Templates Drawer ----------
       const TEMPLATES = [
-        { 
-          id: 'executive_board', 
-          name: '🏢 Executive Board', 
-          desc: 'Business strategy with CEO, COO, CFO, and CTO perspectives.',
-          preamble: 'You are an executive board collaborating on a business strategy question. Each member brings their area of expertise: the CEO sets strategic vision and alignment, the COO focuses on execution and operations, the CFO manages financial health and resource allocation, and the CTO defines technical architecture and feasibility. Work together to produce a comprehensive business strategy with clear action items and owners.',
-          roles: ['ceo', 'coo', 'cfo', 'cto']
+        // ── Writing & Content ────────────────────────────────────────────
+        {
+          id: 'essay',
+          name: '📝 Essay / Report',
+          desc: 'Research a topic, draft a structured argument, then edit to a polished final document.',
+          preamble: 'You are collaborating to produce a polished written piece. The Researcher finds and verifies the key facts and angles. The Writer drafts a clear, structured argument. The Editor tightens the prose and fixes any gaps. The Synthesizer produces the final document as clean markdown — that is the deliverable.',
+          roles: ['researcher', 'writer', 'editor', 'synthesizer'],
         },
-        { 
-          id: 'skill_writer', 
-          name: '📝 Skill Writer', 
-          desc: 'Produce a reusable SKILL.md file for AI assistants.',
-          preamble: 'You are collaborating to produce a reusable AI assistant skill (SKILL.md file). The drafter writes the initial skill content, the critic stress-tests it for edge cases and gaps, and the synthesizer outputs the final clean SKILL.md in a fenced markdown block.',
-          roles: ['outline', 'critique', 'synthesizer']
+        {
+          id: 'blog_post',
+          name: '📰 Blog Post',
+          desc: 'Generate a compelling, shareable blog post on any topic.',
+          preamble: 'You are collaborating to write a compelling blog post. The Writer drafts an engaging post with a strong hook, clear sections, and a concrete takeaway. The Critic identifies anything weak, boring, or unsubstantiated. The Editor tightens it. The Synthesizer outputs the final post as markdown — ready to publish.',
+          roles: ['writer', 'critic', 'editor', 'synthesizer'],
         },
-        { 
-          id: 'lora_dataset', 
-          name: '🧠 LoRA Dataset Generator', 
-          desc: 'Generate instruction/response training pairs for LoRA fine-tuning.',
-          preamble: 'You are collaborating to produce high-quality instruction/response training pairs for a LoRA fine-tune. The drafter generates 5 instruction+response pairs on the topic. The critic checks them for quality, bias, and accuracy. The synthesizer outputs the final pairs as a JSON array: [{"instruction": "...", "input": "", "response": "..."}]. Output MUST be in a fenced json block.',
-          roles: ['outline', 'critique', 'synthesizer']
+        {
+          id: 'email_pitch',
+          name: '📧 Email / Pitch',
+          desc: 'Draft a sharp email, cold pitch, or persuasive message.',
+          preamble: 'You are collaborating to write a high-impact email or pitch. The Writer drafts a version that is specific, scannable, and ends with a clear ask. The Critic finds anything vague, too long, or that buries the point. The Synthesizer outputs the final version as plain text — ready to send.',
+          roles: ['writer', 'critic', 'synthesizer'],
         },
-        { 
-          id: 'prompt_pack', 
-          name: '📋 Prompt Pack Generator', 
-          desc: 'Create a battle-tested prompt pack for AI coders.',
-          preamble: 'You are collaborating to produce a battle-tested prompt pack for AI coders. The drafter writes prompt variants, the critic evaluates which extracts the best model responses, and the synthesizer outputs the final prompts as a fenced markdown document with sections per use case.',
-          roles: ['outline', 'critique', 'synthesizer']
+        // ── Thinking & Decisions ──────────────────────────────────────
+        {
+          id: 'decision',
+          name: '🧭 Decision Analysis',
+          desc: 'Lay out your options, stress-test them, and get a clear recommendation.',
+          preamble: "You are collaborating to reach a well-reasoned decision. The Strategist maps the options and their tradeoffs. The Devil’s Advocate argues the strongest case against the leading option. The Researcher checks any factual claims. The Synthesizer produces a final recommendation as markdown: Options, Tradeoffs, Recommendation, Risks.",
+          roles: ['strategist', 'devil', 'researcher', 'synthesizer'],
         },
-        { 
-          id: 'code_review', 
-          name: '🔍 Code Review Council', 
-          desc: 'Multi-model structured code or architecture review.',
-          preamble: 'You are a panel of senior engineers reviewing code or architecture. Each participant independently reviews the submission, identifies bugs, anti-patterns, and improvements. The synthesizer produces a final structured review report in markdown with sections: Critical Issues, Suggestions, Positives.',
-          roles: ['outline', 'critique', 'synthesizer']
+        {
+          id: 'debate',
+          name: '🗣️ Debate Both Sides',
+          desc: 'Argue for and against a position, then get a balanced verdict.',
+          preamble: 'You are collaborating to explore both sides of a question fairly. One model argues the strongest case FOR. Another argues the strongest case AGAINST. The Synthesizer produces a balanced verdict as markdown: For, Against, Verdict, What would change the answer.',
+          roles: ['writer', 'devil', 'synthesizer'],
         },
-        { 
-          id: 'explain_coder', 
-          name: '🎓 Explain to New Coders', 
-          desc: 'Explain a concept clearly to a new programmer.',
-          preamble: 'You are collaborating to explain a technical concept clearly to a new programmer. The drafter writes an initial explanation with an analogy and example code. The critic checks for clarity and correctness. The synthesizer outputs a final polished explanation in markdown with: Concept, Analogy, Example Code, Common Mistakes.',
-          roles: ['outline', 'critique', 'synthesizer']
+        {
+          id: 'research_brief',
+          name: '🔍 Research Brief',
+          desc: 'Gather multiple angles on a topic and synthesise a clear summary.',
+          preamble: 'You are collaborating to produce a research brief. The Researcher finds and organises the key facts, context, and open questions. The Critic identifies gaps and unverified claims. The Synthesizer produces a structured brief as markdown: Key Findings, Open Questions, Recommended Next Steps.',
+          roles: ['researcher', 'critic', 'synthesizer'],
+        },
+        // ── Work & Business ───────────────────────────────────────────────
+        {
+          id: 'product_brief',
+          name: '💼 Product Brief',
+          desc: 'Define a product or feature clearly: problem, solution, success criteria.',
+          preamble: 'You are collaborating to write a product brief. The Strategist defines the problem and goal. The User Advocate pushes on whether this actually serves the target user. The Critic identifies risks and gaps. The Synthesizer outputs a clean brief as markdown: Problem, Proposed Solution, Success Criteria, Risks.',
+          roles: ['strategist', 'user-advocate', 'critic', 'synthesizer'],
+        },
+        {
+          id: 'marketing_copy',
+          name: '📣 Marketing Copy',
+          desc: 'Generate and sharpen copy for a landing page, ad, or product description.',
+          preamble: 'You are collaborating to produce effective marketing copy. The Writer drafts copy that speaks directly to the target audience with a clear value proposition. The Critic finds anything that is vague, generic, or unlikely to convert. The Synthesizer outputs the final polished copy as markdown — ready to use.',
+          roles: ['writer', 'critic', 'synthesizer'],
+        },
+        // ── Learning & Explaining ───────────────────────────────────────
+        {
+          id: 'explainer',
+          name: '💡 Explain This',
+          desc: 'Get a topic explained from multiple angles, synthesised into one clear explainer.',
+          preamble: 'You are collaborating to explain a topic clearly. The Teacher gives an accessible explanation using concrete examples and analogies. The Researcher adds depth and corrects any inaccuracies. The Critic identifies anything that would confuse the audience. The Synthesizer outputs a final explainer as markdown: Core Concept, Why It Matters, Key Details, Common Misconceptions.',
+          roles: ['teacher', 'researcher', 'critic', 'synthesizer'],
+        },
+        {
+          id: 'study_guide',
+          name: '📚 Study Guide',
+          desc: 'Turn a topic into a structured study guide with key concepts and practice questions.',
+          preamble: 'You are collaborating to produce a study guide. The Teacher identifies the key concepts and builds a logical learning order. The Expert adds precision and depth. The Synthesizer outputs the final guide as markdown: Key Concepts, Explanations, Example Questions, Things to Remember.',
+          roles: ['teacher', 'expert', 'synthesizer'],
+        },
+        // ── Code & Technical ──────────────────────────────────────────────
+        {
+          id: 'code_review',
+          name: '🔍 Code Review',
+          desc: 'Multi-model structured review of code, architecture, or a technical design.',
+          preamble: 'You are a panel reviewing code or a technical design. Each participant reviews independently and identifies bugs, security issues, anti-patterns, and improvements. The Synthesizer produces a structured review as markdown: Critical Issues, Suggestions, What is Working Well.',
+          roles: ['code-reviewer', 'architect', 'synthesizer'],
+        },
+        {
+          id: 'architecture',
+          name: '🏗️ Architecture Review',
+          desc: 'Stress-test a system design for failure modes, scalability, and hidden tradeoffs.',
+          preamble: "You are collaborating to review a technical architecture. The Architect maps component boundaries, data flows, and design decisions. The Devil’s Advocate finds the most likely failure modes and hidden tradeoffs. The Synthesizer produces a structured assessment as markdown: Design Overview, Risks, Recommended Changes.",
+          roles: ['architect', 'devil', 'synthesizer'],
         },
       ];
-    
-      function openTemplatesDrawer() { $('templatesOverlay').classList.add('open'); renderTemplatesList(); }
+            function openTemplatesDrawer() { $('templatesOverlay').classList.add('open'); renderTemplatesList(); }
       function closeTemplatesDrawer() { $('templatesOverlay').classList.remove('open'); }
     
       function renderTemplatesList() {
-        $('templatesList').innerHTML = TEMPLATES.map(t => `
-          <div style="border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--bg)">
-            <div style="font-weight:700;font-size:14px;margin-bottom:4px">${t.name}</div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${t.desc}</div>
-            <button class="btn primary" data-tpl="${t.id}" style="font-size:12px">Apply Template</button>
-          </div>
-        `).join('');
+        const CATEGORIES = [
+          { label: '✍️ Writing & Content',      ids: ['essay', 'blog_post', 'email_pitch'] },
+          { label: '🧭 Thinking & Decisions',     ids: ['decision', 'debate', 'research_brief'] },
+          { label: '💼 Work & Business',          ids: ['product_brief', 'marketing_copy'] },
+          { label: '💡 Learning & Explaining',    ids: ['explainer', 'study_guide'] },
+          { label: '💻 Code & Technical',         ids: ['code_review', 'architecture'] },
+        ];
+        const byId = Object.fromEntries(TEMPLATES.map(t => [t.id, t]));
+        $('templatesList').innerHTML = CATEGORIES.map(cat => {
+          const items = cat.ids.map(id => byId[id]).filter(Boolean);
+          if (!items.length) return '';
+          return '<div style="margin-bottom:16px">'
+            + '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 7px">' + esc(cat.label) + '</div>'
+            + items.map(t =>
+                '<div style="border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:7px;background:var(--bg);display:flex;align-items:flex-start;gap:10px">'
+                + '<div style="flex:1;min-width:0">'
+                + '<div style="font-weight:600;font-size:13px;margin-bottom:3px">' + esc(t.name) + '</div>'
+                + '<div style="font-size:12px;color:var(--muted);line-height:1.4">' + esc(t.desc) + '</div>'
+                + '</div>'
+                + '<button class="btn primary" data-tpl="' + t.id + '" style="font-size:12px;white-space:nowrap;flex-shrink:0;margin-top:1px">Apply</button>'
+                + '</div>'
+              ).join('')
+            + '</div>';
+        }).join('');
       }
     
       if ($('templatesList')) $('templatesList').addEventListener('click', e => {
@@ -3225,98 +3273,29 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
         setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       }
     
-      async function makePluginZip(skillText) {
-        // Simple ZIP builder (no deps) — store-only method (no compression)
-        const enc = new TextEncoder();
-        const date = new Date();
-        const dosDate = ((date.getFullYear()-1980)<<9)|((date.getMonth()+1)<<5)|date.getDate();
-        const dosTime = (date.getHours()<<11)|(date.getMinutes()<<5)|(date.getSeconds()>>1);
-        const readmeTxt = `# Roundtable Plugin\n\nGenerated by Roundtable on ${date.toLocaleDateString()}.\n\nSee SKILL.md for skill instructions.\n`;
-        const files = [
-          { name: 'SKILL.md', data: enc.encode(skillText) },
-          { name: 'README.md', data: enc.encode(readmeTxt) },
-        ];
-        // Build local file entries
-        let localParts = [], cdParts = [], offset = 0;
-        for (const f of files) {
-          const nameBytes = enc.encode(f.name);
-          const crc = crc32(f.data);
-          const local = new Uint8Array(30 + nameBytes.length + f.data.length);
-          const lv = new DataView(local.buffer);
-          lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0, true); lv.setUint16(8, 0, true);
-          lv.setUint16(10, dosTime, true); lv.setUint16(12, dosDate, true);
-          lv.setUint32(14, crc, true); lv.setUint32(18, f.data.length, true); lv.setUint32(22, f.data.length, true);
-          lv.setUint16(26, nameBytes.length, true); lv.setUint16(28, 0, true);
-          local.set(nameBytes, 30); local.set(f.data, 30 + nameBytes.length);
-          const cd = new Uint8Array(46 + nameBytes.length);
-          const cv = new DataView(cd.buffer);
-          cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0, true); cv.setUint16(10, 0, true);
-          cv.setUint16(12, dosTime, true); cv.setUint16(14, dosDate, true);
-          cv.setUint32(16, crc, true); cv.setUint32(20, f.data.length, true); cv.setUint32(24, f.data.length, true);
-          cv.setUint16(28, nameBytes.length, true); cv.setUint16(30, 0, true); cv.setUint16(32, 0, true); cv.setUint16(34, 0, true); cv.setUint16(36, 0, true); cv.setUint32(42, offset, true);
-          cd.set(nameBytes, 46);
-          localParts.push(local); cdParts.push(cd); offset += local.length;
-        }
-        const cdSize = cdParts.reduce((s, p) => s + p.length, 0);
-        const eocd = new Uint8Array(22);
-        const ev = new DataView(eocd.buffer);
-        ev.setUint32(0, 0x06054b50, true); ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
-        ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
-        ev.setUint32(12, cdSize, true); ev.setUint32(16, offset, true); ev.setUint16(20, 0, true);
-        const all = [...localParts, ...cdParts, eocd];
-        const total = all.reduce((s, p) => s + p.length, 0);
-        const zip = new Uint8Array(total); let pos = 0;
-        for (const p of all) { zip.set(p, pos); pos += p.length; }
-        return zip;
-      }
-    
-      function crc32(data) {
-        let table = crc32._t;
-        if (!table) {
-          table = crc32._t = new Uint32Array(256);
-          for (let i = 0; i < 256; i++) {
-            let c = i;
-            for (let j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-            table[i] = c;
-          }
-        }
-        let crc = 0xFFFFFFFF;
-        for (let i = 0; i < data.length; i++) crc = table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
-        return (crc ^ 0xFFFFFFFF) >>> 0;
-      }
     
       async function doSmartExport(type) {
         if (artifactCurrentIdx < 0) { alert('No artifact to export.'); return; }
         const { lang, text } = artifactHistory[artifactCurrentIdx];
         const dateSlug = new Date().toISOString().slice(0, 10);
-    
-        if (type === 'skill') {
-          let out = text;
-          if (!out.startsWith('---')) {
-            out = `---\nname: my-skill\ndescription: Generated by Roundtable\n---\n\n` + out;
-          }
-          downloadBlob(new Blob([out], { type: 'text/markdown' }), `SKILL.md`);
-        } else if (type === 'jsonl') {
-          let jsonl = '';
-          try {
-            const arr = JSON.parse(text);
-            if (Array.isArray(arr)) {
-              jsonl = arr.map(r => JSON.stringify(r)).join('\n');
-            } else {
-              jsonl = JSON.stringify(arr);
-            }
-          } catch {
-            jsonl = JSON.stringify({ instruction: 'See content', input: '', response: text });
-          }
-          downloadBlob(new Blob([jsonl], { type: 'application/jsonlines' }), `roundtable-lora-${dateSlug}.jsonl`);
-        } else if (type === 'promptpack') {
-          const header = `---\ntitle: Prompt Pack\ngenerated: ${dateSlug}\nsource: Roundtable\n---\n\n`;
-          downloadBlob(new Blob([header + text], { type: 'text/markdown' }), `prompt-pack-${dateSlug}.md`);
-        } else if (type === 'plugin') {
-          const zip = await makePluginZip(text);
-          downloadBlob(new Blob([zip], { type: 'application/zip' }), `roundtable-plugin-${dateSlug}.zip`);
-        } else if (type === 'md') {
+        if (type === 'md') {
           downloadBlob(new Blob([text], { type: 'text/markdown' }), `roundtable-${dateSlug}.md`);
+        } else if (type === 'html') {
+          const isHtml = lang === 'html' || text.trim().startsWith('<');
+          const out = isHtml ? text
+            : `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Roundtable export</title>` +
+              `<style>body{font-family:sans-serif;max-width:800px;margin:2rem auto;line-height:1.6;padding:0 1rem}pre{background:#f5f5f5;padding:1rem;border-radius:6px;overflow-x:auto}</style></head>` +
+              `<body><pre style="white-space:pre-wrap">${text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre></body></html>`;
+          downloadBlob(new Blob([out], { type: 'text/html' }), `roundtable-${dateSlug}.html`);
+        } else if (type === 'txt') {
+          const plain = text
+            .replace(/\`\`\`[\w]*\n?/g, '')
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/\*([^*]+)\*/g, '$1')
+            .replace(/^#{1,6}\s+/gm, '')
+            .replace(/^[-*]\s+/gm, '- ')
+            .trim();
+          downloadBlob(new Blob([plain], { type: 'text/plain' }), `roundtable-${dateSlug}.txt`);
         }
       }
     
