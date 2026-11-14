@@ -1,7 +1,7 @@
 {
-  "name": "freellmapi-roundtable",
+  "name": "roundtable",
   "version": "0.2.1",
-  "description": "Bring local, cloud, and FreeLLMAPI models into one role-based shared conversation.",
+  "description": "Bring local and cloud AI models into one role-based shared conversation.",
   "private": true,
   "license": "MIT",
   "scripts": {
