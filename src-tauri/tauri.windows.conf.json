@@ -9,7 +9,7 @@
     }
   },
   "build": {
-    "beforeBuildCommand": "",
+    "beforeBuildCommand": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Force dist | Out-Null; Copy-Item index.html dist -Force; if (Test-Path dist\\src) { Remove-Item dist\\src -Recurse -Force }; Copy-Item src dist\\src -Recurse -Force\"",
     "frontendDist": "../dist"
   },
   "app": {

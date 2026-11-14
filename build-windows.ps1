@@ -32,22 +32,39 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# 1. Ensure frontend dist exists (Tauri needs ../dist/index.html)
+# 1. Ensure frontend dist exists (Tauri needs ../dist/index.html AND ../dist/src/)
 $Dist = Join-Path $Root "dist"
 $IndexHtml = Join-Path $Dist "index.html"
 $SrcIndex = Join-Path $Root "index.html"
-if (-not $SkipDistCheck -and (-not (Test-Path $IndexHtml))) {
-    Write-Host "Copying index.html -> dist/" -ForegroundColor Yellow
-    New-Item -ItemType Directory -Force -Path $Dist | Out-Null
-    Copy-Item $SrcIndex $IndexHtml
-} elseif (-not $SkipDistCheck) {
-    # Keep dist in sync with the source so stale builds can't happen
-    $srcHash = (Get-FileHash $SrcIndex -Algorithm SHA256).Hash
-    $dstHash = (Get-FileHash $IndexHtml -Algorithm SHA256).Hash
-    if ($srcHash -ne $dstHash) {
-        Write-Host "index.html changed since last dist sync — updating dist/" -ForegroundColor Yellow
-        Copy-Item $SrcIndex $IndexHtml -Force
+$SrcDir = Join-Path $Root "src"
+$DistSrc = Join-Path $Dist "src"
+
+New-Item -ItemType Directory -Force -Path $Dist | Out-Null
+
+if (-not $SkipDistCheck) {
+    if (-not (Test-Path $IndexHtml)) {
+        Write-Host "Copying index.html -> dist/" -ForegroundColor Yellow
+        Copy-Item $SrcIndex $IndexHtml
+    } else {
+        # Keep dist in sync with the source so stale builds can't happen
+        $srcHash = (Get-FileHash $SrcIndex -Algorithm SHA256).Hash
+        $dstHash = (Get-FileHash $IndexHtml -Algorithm SHA256).Hash
+        if ($srcHash -ne $dstHash) {
+            Write-Host "index.html changed since last dist sync — updating dist/" -ForegroundColor Yellow
+            Copy-Item $SrcIndex $IndexHtml -Force
+        }
     }
+
+    # index.html does `import { StorageFactory } from './src/index.js'`.
+    # dist/ is gitignored, so a fresh clone has NO dist/src — without this copy
+    # the bundled app's module import 404s and storage never initialises.
+    if (-not (Test-Path $SrcDir)) {
+        Write-Error "src/ directory not found at $SrcDir"
+        exit 1
+    }
+    Write-Host "Syncing src/ -> dist/src/" -ForegroundColor Yellow
+    if (Test-Path $DistSrc) { Remove-Item $DistSrc -Recurse -Force }
+    Copy-Item $SrcDir $DistSrc -Recurse -Force
 }
 
 # 2. Resolve config file
