@@ -1741,7 +1741,7 @@ try {
           let base;
           if (provider === 'gateway' || !pdef || !pdef.base) {
             base = await getApiBase();
-            base = base || '';
+            if (base === null || base === undefined) base = '';
           } else {
             base = pdef.base;
           }
@@ -2243,7 +2243,7 @@ try {
           authKey = S.cfg.directKey || '';
         }
 
-        if (!base) { note.textContent = 'No gateway URL configured.'; return; }
+        if (base === null || base === undefined) { note.textContent = 'No gateway URL configured.'; return; }
 
         try {
           const url = base + (pdef.modelsPath || '/v1/models');
