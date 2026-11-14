@@ -1,64 +1,47 @@
-# Roundtable — One Conversation for Your AI Models
+# Roundtable — One Conversation, Multiple AI Models
 
-**Bring your local models, cloud models, and [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) models into one conversation.**
+Send a prompt once. Each model takes a turn in the same shared conversation, reads every earlier reply, and builds on it. A designated Synthesizer produces one clean final document.
 
-Choose your models, give them different roles, and ask once. They take turns in the same shared conversation, seeing the earlier replies and building on each other's work. No switching between separate model chats or stitching answers together yourself.
+No switching between tabs. No stitching answers together yourself.
 
-Roundtable streams replies as they arrive, can route through local engines such as Ollama and LM Studio, direct cloud providers, or FreeLLMAPI, and can extract a synthesizer's response as an artifact. Because models respond in sequence, total response time still depends on the models and providers you choose.
-
-![A chat where models deliberate in sequence and collaborate on artifacts](docs/chat.png)
+![Roundtable chat with multiple models deliberating](docs/chat.png)
 
 ---
 
-## Key Features
+## Why use it
 
-- **One Shared Conversation**: Models take turns in your chosen order, see prior replies, and contribute under assigned roles (`draft` → `critique` → `synthesize`).
-- **Live Artifact & Evolving Previews**: Models tagged with the `synthesizer` role produce documents, code, or web apps rendered live in a side panel (Markdown, HTML/CSS/JS sandbox, or code fences).
-- **In-Memory Version History & Diff**: Step back through revisions (`v1`, `v2`, ...) with an on-demand line differ (`🔀 Diff`).
-- **Local, Cloud & FreeLLMAPI Models**: Combine local Ollama (`:11434`) and LM Studio (`:1234`) models with FreeLLMAPI models or supported direct cloud providers in the same lineup.
-- **Quota & Cost Transparency**: Calculates exact `models × rounds` request volume before dispatching.
-- **Read-Only Consensus Gauge**: Real-time keyword overlap tracking (`🟢 High agreement`, `🟡 Partial agreement`, `🔴 Diverging`) to gauge convergence.
-- **Multimodal Ready**: Drag-and-drop, upload, or paste (`Cmd+V` / `Ctrl+V`) images directly into prompts for vision-enabled models.
-- **Privacy-First**: Zero tracking, 127.0.0.1-only local proxy, and optional session-only key storage.
+Most AI tools give you one model at a time. Roundtable runs them in sequence — a Writer drafts, a Critic finds the holes, a Researcher adds evidence, and a Synthesizer produces the final output. The result is more thorough than any single model working alone.
+
+Works for writing, research, decisions, code review, marketing copy, study guides, product briefs, and anything else where multiple perspectives make a better answer.
 
 ---
 
-## 📥 Download Installers
+## Key features
 
-### macOS
-**Download the latest macOS installer (Apple Silicon):**
-- [Roundtable_0.2.0_aarch64.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable_0.2.0_aarch64.dmg) (Native DMG, 6.1 MB)
+- **Shared conversation** — every model reads the full thread before replying, including what earlier models said
+- **Role-based lineup** — assign roles like Writer, Critic, Researcher, Synthesizer; each model knows its job
+- **Live artifact panel** — the Synthesizer's output renders in a side panel (Markdown, HTML, or code) with version history and line-diff
+- **12 ready-made templates** — Essay, Blog Post, Decision Analysis, Code Review, Marketing Copy, Product Brief, and more — each pre-loads the right roles and instructions
+- **All major providers** — OpenRouter, Groq, Google Gemini, OpenAI, Anthropic, or any OpenAI-compatible gateway (Ollama, LM Studio, FreeLLMAPI, LiteLLM)
+- **Batch mode** — run multiple prompts through the full lineup and collect synthesized artifacts as a downloadable file
+- **Privacy-first** — keys stored in-browser only, local proxy binds to 127.0.0.1, zero telemetry
 
-**System Requirements:** macOS 12+, FreeLLMAPI running on localhost:31415
+---
+
+## Download
+
+### macOS (Apple Silicon)
+[Roundtable_0.2.1_aarch64.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/tag/v0.2.1) — requires macOS 12+
 
 ### Windows
-**Download the latest Windows installer:**
-- [Roundtable-Windows-x64-v0.2.0.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable-Windows-x64-v0.2.0.exe) (NSIS Installer)
-- [Roundtable-Windows-x64-v0.2.0.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable-Windows-x64-v0.2.0.msi) (Windows Installer)
+[Roundtable-Windows-x64-v0.2.1.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/tag/v0.2.1) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/tag/v0.2.1) — requires Windows 10/11 64-bit
 
-**System Requirements:** Windows 10/11 64-bit, FreeLLMAPI running on localhost:31415
-
-### Linux
-**Download the latest Linux installer:**
-- [Roundtable-Linux-x64-v0.2.0.AppImage](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.0/Roundtable-Linux-x64-v0.2.0.AppImage)
-
-**System Requirements:** Linux x64 with glibc 2.31+, FreeLLMAPI running on localhost:31415
+### Web (Node.js server)
+Run it in any browser — no installation needed beyond Node.js 18+.
 
 ---
 
-## Choose Your Setup
-
-| Distribution | Best For | How to Run |
-| :--- | :--- | :--- |
-| **macOS Native App (`.dmg`)** | macOS users (Apple Silicon) wanting a native, zero-setup desktop app | Download the `.dmg` from [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases) |
-| **Windows Native App (`.exe`/`.msi`)** | Windows 10/11 users wanting a standalone installer | Download from [Releases](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases) or see Download Installers above |
-| **Web Server (`Node.js`)** | Headless systems, servers, or local browsers | `npm start` (zero third-party dependencies) |
-
----
-
-## Quick Start (Web Server)
-
-Requires [Node.js](https://nodejs.org) 18 or newer and a running FreeLLMAPI instance or local engine (Ollama/LM-Studio).
+## Quick start (web server)
 
 ```bash
 git clone https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable.git
@@ -67,104 +50,104 @@ npm install
 npm start
 ```
 
-Open <http://localhost:5173>. On initial launch, the **Setup** drawer opens:
+Open <http://localhost:5173>. The Setup drawer opens automatically on first run.
 
-1. **Choose model sources**: Detect local Ollama or LM Studio models, load models through FreeLLMAPI, or configure a supported direct provider.
-2. **Build your lineup**: Set the order and assign roles such as `Drafting`, `Critique`, and `Synthesizer`.
-3. **Start one conversation**: Send a prompt once. Each model takes its turn in the shared thread and can build on earlier replies.
-4. **Review the result**: Follow streamed responses in the conversation and view synthesized artifacts in the preview pane.
-
-Models respond one after another, not simultaneously. Roundtable removes the need to switch between separate model chats; it does not eliminate each model's generation time.
+1. **Add models** — go to the Cloud Models tab, pick a provider (OpenRouter is free), enter your key, and click Load Models. Or use the Local Models tab to detect Ollama or LM Studio.
+2. **Apply a template** — click **🎯 Templates** in the header and choose one. It assigns roles to your models and sets focused instructions.
+3. **Send a prompt** — type your question and press Enter. Models answer in order. The Synthesizer's output appears in the right panel.
 
 ---
 
-## How It Works
+## Model sources
 
-Each participant takes a turn in the same conversation:
+| Source | Setup |
+|---|---|
+| **OpenRouter** | Free key at [openrouter.ai/keys](https://openrouter.ai/keys) — access to hundreds of models |
+| **Groq** | Free key at [console.groq.com/keys](https://console.groq.com/keys) — very fast inference |
+| **Google Gemini** | Free key at [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| **OpenAI** | Key at [platform.openai.com](https://platform.openai.com/api-keys) |
+| **Anthropic** | Key at [console.anthropic.com](https://console.anthropic.com/settings/keys) — add model IDs manually |
+| **Ollama** | Run locally, click Detect Local Models |
+| **LM Studio** | Run locally, click Detect Local Models |
+| **Any OpenAI-compatible gateway** | Enter base URL in the gateway option |
 
-- **Shared context**: Every model receives the conversation, shared instructions, and its assigned role.
-- **Replies build on replies**: Earlier model responses are included with their names, so later participants can critique, extend, or synthesize the work.
-- **One place to follow along**: Responses stream into the same conversation instead of requiring a separate chat or screen for each model.
-- **Graceful Fallbacks**: If a provider rate-limits (429) or experiences downtime, Roundtable automatically re-routes via your designated fallback model with full provenance tagging.
-- **Session History**: Save, search, and recall past conversations with the built-in **Saved Chats** drawer.
+---
+
+## Templates
+
+| Category | Templates |
+|---|---|
+| ✍️ Writing & Content | Essay / Report, Blog Post, Email / Pitch |
+| 🧭 Thinking & Decisions | Decision Analysis, Debate Both Sides, Research Brief |
+| 📋 Work & Business | Product Brief, Marketing Copy |
+| 💡 Learning & Explaining | Explain This, Study Guide |
+| 💻 Code & Technical | Code Review, Architecture Review |
+
+---
+
+## Roles
+
+Assign any of these to a model slot. Templates assign them automatically.
+
+| Role | What it does |
+|---|---|
+| ✍️ Writer | Drafts clear, focused prose |
+| 🔎 Critic | Challenges claims and finds gaps |
+| 📚 Researcher | Grounds claims in evidence |
+| ✏️ Editor | Tightens and polishes |
+| 😈 Devil's Advocate | Argues the other side |
+| 🔗 Synthesizer | Produces the final document |
+| 🧭 Strategist | Goals, tradeoffs, long game |
+| 🎓 Domain Expert | Applies deep knowledge |
+| 👤 User Advocate | Keeps real people in view |
+| 🐛 Code Reviewer | Bugs, security, maintainability |
+| 🏗️ Architect | Structure and design decisions |
+| 🧑‍🏫 Teacher | Explains clearly for the stated audience |
 
 ---
 
 ## Configuration
 
 | Variable | Default | Description |
-| --- | --- | --- |
+|---|---|---|
 | `PORT` | `5173` | Local HTTP port |
-| `FREELLMAPI_URL` | Auto-detected (`:31415` or `:3001`) | Upstream FreeLLMAPI gateway endpoint |
-| `FREELLMAPI_KEY` | None | Optional environment-level default key |
-
-```bash
-FREELLMAPI_URL=http://127.0.0.1:31415 PORT=5173 npm start
-```
+| `FREELLMAPI_URL` | Auto-detected | Base URL for an OpenAI-compatible gateway |
+| `FREELLMAPI_KEY` | None | Optional default key for the gateway |
 
 ---
 
-## Building Desktop Apps Locally
+## Building desktop apps
 
-### macOS (.app & .dmg)
-Requires Rust and the Tauri CLI:
+### macOS
 ```bash
-# Build .app and install directly to /Applications/Roundtable.app:
-npm run build:install
-
-# Build standalone macOS .dmg disk image:
-npm run build:mac
-
-# Verify local installation, binary freshness, and FreeLLMAPI connectivity:
-npm run verify
-
-# Or to build, sign, and notarize:
-./scripts/build-and-notarize.sh
+npm run build:mac    # builds .app
+npm run build:dmg    # builds signed + notarized .dmg
+npm run verify       # health checks
 ```
 
-### Windows (.exe / .msi)
-Built natively on your Windows machine (ThinkCentre). The one-step builder syncs the
-frontend, runs the Tauri build, and lists the produced installers:
-
+### Windows (run on Windows machine)
 ```powershell
-# From the repo root:
 powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 ```
 
-After the build, launch the app with its dependencies (FreeLLMAPI + local proxy):
-
-```powershell
-# Double-click, or:
-powershell -ExecutionPolicy Bypass -File .\Roundtable-Windows-Start.bat
-```
-
-**Prerequisites on the Windows machine:** Rust toolchain (`cargo`), Node.js 18+,
-`cargo-tauri` (`cargo install tauri-cli`), and FreeLLMAPI running on `localhost:31415`.
-
 ---
 
-## Security & Privacy
+## Security & privacy
 
-- The local proxy binds strictly to `127.0.0.1`.
-- API credentials are stored only on the client side (in-memory by default, or opt-in `localStorage`).
-- Zero telemetries, external analytics, or remote logging.
+- Local proxy binds strictly to `127.0.0.1` — not reachable from other machines
+- API keys stored in-browser only (session memory by default; opt-in localStorage)
+- No telemetry, no analytics, no remote logging
 
 ---
 
 ## Support
 
-Roundtable is free, open source (MIT), and built and maintained by one person. If it saves you time, you can [buy me a coffee](https://buymeacoffee.com/justmemedia) to help me keep building.
+Roundtable is free, open source (MIT), and maintained by one person. If it saves you time, [buy me a coffee](https://buymeacoffee.com/justmemedia).
 
-Need help, want to report a bug, or have a feature idea? Use one of these:
+Questions, bugs, feature ideas: [open an issue](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/issues) or [start a discussion](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/discussions).
 
-- [Open a GitHub issue](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/issues)
-- [Start a GitHub discussion](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/discussions)
-- [Report a security issue privately](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/security/advisories/new)
-
-Roundtable is an unofficial companion to [FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi). Support here goes to Roundtable, not to the FreeLLMAPI project.
-
-* * *
+---
 
 ## License
 
-[MIT](LICENSE) © Just Me Media. Unofficial companion project for FreeLLMAPI.
+[MIT](LICENSE) © Just Me Media
