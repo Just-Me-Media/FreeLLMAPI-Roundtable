@@ -1,0 +1,115 @@
+name: Sign Windows Release
+
+# Signs an ALREADY-UPLOADED Windows installer with the updater key and merges a
+# windows-x86_64 entry into the release's updates.json, preserving the
+# darwin-aarch64 entry.
+#
+# Use this when the installer was built locally on the ThinkCentre with
+# build-windows.ps1 and attached with:
+#   gh release upload v0.2.1 --clobber Roundtable_0.2.1_x64-setup.exe
+#
+# It runs on a GitHub-hosted runner because the ThinkCentre has no registered
+# self-hosted runner, and the private key only exists as the repo secret
+# TAURI_SIGNING_PRIVATE_KEY. Actions minutes are free for public repositories.
+#
+# Requires repo secrets:
+#   TAURI_SIGNING_PRIVATE_KEY           (key id 6E8C99D71D9B2B5A)
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  (empty string if the key has no password)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to sign (e.g. v0.2.1)'
+        required: true
+      asset:
+        description: 'Installer asset filename on that release'
+        required: true
+        default: 'Roundtable_0.2.1_x64-setup.exe'
+
+permissions:
+  contents: write
+
+jobs:
+  sign:
+    name: Sign installer and merge updates.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download installer and current manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p staging
+          gh release download "${{ inputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "${{ inputs.asset }}" \
+            --dir staging
+          # The manifest may not exist yet if Windows is the first platform.
+          gh release download "${{ inputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern updates.json \
+            --dir staging || echo "No existing updates.json (starting fresh)"
+          ls -l staging
+
+      - name: Sign installer and merge manifest
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY repo secret is not set"
+            exit 1
+          fi
+
+          VERSION="${{ inputs.tag }}"
+          VERSION="${VERSION#v}"
+
+          ARGS=(scripts/updates-manifest.js --version "$VERSION")
+          if [ -f staging/updates.json ]; then
+            ARGS+=(--base staging/updates.json)
+          fi
+          ARGS+=(--platform "windows-x86_64=staging/${{ inputs.asset }}")
+          ARGS+=(--out staging/updates.json)
+
+          node "${ARGS[@]}"
+
+      - name: Verify manifest has a windows entry
+        run: |
+          set -euo pipefail
+          node -e '
+            const m = require("./staging/updates.json");
+            if (!m.platforms || !m.platforms["windows-x86_64"]) {
+              console.error("updates.json has no windows-x86_64 entry");
+              process.exit(1);
+            }
+            console.log("version   :", m.version);
+            console.log("platforms :", Object.keys(m.platforms).join(", "));
+            console.log("url       :", m.platforms["windows-x86_64"].url);
+          '
+
+      - name: Publish updates.json
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release upload "${{ inputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --clobber staging/updates.json
+          echo "--- published manifest ---"
+          cat staging/updates.json

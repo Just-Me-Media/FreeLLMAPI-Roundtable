@@ -50,13 +50,13 @@ if (-not $SkipDistCheck) {
         $srcHash = (Get-FileHash $SrcIndex -Algorithm SHA256).Hash
         $dstHash = (Get-FileHash $IndexHtml -Algorithm SHA256).Hash
         if ($srcHash -ne $dstHash) {
-            Write-Host "index.html changed since last dist sync — updating dist/" -ForegroundColor Yellow
+            Write-Host "index.html changed since last dist sync - updating dist/" -ForegroundColor Yellow
             Copy-Item $SrcIndex $IndexHtml -Force
         }
     }
 
     # index.html does `import { StorageFactory } from './src/index.js'`.
-    # dist/ is gitignored, so a fresh clone has NO dist/src — without this copy
+    # dist/ is gitignored, so a fresh clone has NO dist/src - without this copy
     # the bundled app's module import 404s and storage never initialises.
     if (-not (Test-Path $SrcDir)) {
         Write-Error "src/ directory not found at $SrcDir"

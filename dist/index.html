@@ -2277,7 +2277,7 @@ try {
             if (!path) return;
             const { invoke } = await window.__TAURI__.core;
             const folder = path.replace(/[/\\][^/\\]+$/, '');
-            await invoke('save_artifact_file', { name: path.split('/').pop(), content: text, folder });
+            await invoke('save_artifact_file', { name: path.split(/[\\/]/).pop(), content: text, folder });
             const b = $('btnSaveArtifactFile');
             if (b) { b.textContent = '\u2705 Saved'; setTimeout(() => b.textContent = '\u2B07\uFE0F Save As…', 2000); }
           } catch (e) { alert('Save failed: ' + e.message); }
@@ -2841,7 +2841,7 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
             // Pass the chosen folder so the file lands where the user picked, not
             // always Documents/Roundtable.
             const folder = path.replace(/[/\\][^/\\]+$/, '');
-            await invoke('save_artifact_file', { name: path.split('/').pop(), content: text, folder });
+            await invoke('save_artifact_file', { name: path.split(/[\\/]/).pop(), content: text, folder });
             const b=$('btnSaveArtifactFile'); b.textContent='\u2705 Saved';
             setTimeout(()=>b.textContent='\u2B07\uFE0F Save As…',2000);
           } catch(e) { alert('Save failed: '+e.message); }
