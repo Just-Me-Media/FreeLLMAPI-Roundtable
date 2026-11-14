@@ -1,5 +1,15 @@
 name: Release Desktop Apps
 
+# Windows releases are built on the self-hosted ThinkCentre runner.
+# macOS releases are built + notarized locally with:
+#   ./scripts/build-and-notarize.sh
+#
+# Both platforms publish a SINGLE shared updates.json. Whichever job runs
+# second merges its platform entry into the manifest already on the release,
+# so macOS users never lose their update path when Windows ships (and vice
+# versa). The manifest must be attached to the release, otherwise
+# releases/latest/download/updates.json 404s and auto-update is dead.
+
 on:
   workflow_dispatch:
 
@@ -13,15 +23,81 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build Tauri App (Windows)
+      - name: Read version
+        id: v
+        shell: pwsh
+        run: |
+          $v = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($v -notmatch '^\d+\.\d+\.\d+') { throw "Unexpected version in tauri.conf.json: $v" }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          "tag=v$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Release: v$v"
+
+      # tauri-action runs `cargo tauri build --config <windows config>`, which
+      # executes the PowerShell beforeBuildCommand that rebuilds dist/src/.
+      # It also creates/updates the GitHub release and uploads the bundles.
+      - name: Build and upload Windows bundles
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: './'
+          args: --config src-tauri/tauri.windows.conf.json
           tagName: v__VERSION__
           releaseName: 'Roundtable v__VERSION__'
           releaseBody: 'Roundtable desktop application release.'
           releaseDraft: false
           prerelease: false
+          # We merge the manifest ourselves so macOS + Windows coexist.
+          includeUpdaterJson: false
 
+      - name: Sign installer and merge updates.json
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tag = "${{ steps.v.outputs.tag }}"
+          $ver = "${{ steps.v.outputs.version }}"
+          $out = Join-Path "releases" $tag
+          New-Item -ItemType Directory -Force $out | Out-Null
+
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw "TAURI_SIGNING_PRIVATE_KEY secret is not set — cannot sign the update."
+          }
+
+          # Pull the manifest already attached to this release (may not exist
+          # if Windows is the first platform to publish this version).
+          gh release download $tag --repo Just-Me-Media/FreeLLMAPI-Roundtable `
+            --pattern updates.json --dir $out 2>$null
+          $base = Join-Path $out "updates.json"
+          $haveBase = Test-Path $base
+
+          # Tauri's updater consumes the NSIS installer on Windows (not the MSI).
+          $nsis = Get-ChildItem "src-tauri\target\release\bundle\nsis\*-setup.exe" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $nsis) { throw "NSIS installer not found under src-tauri\target\release\bundle\nsis" }
+
+          $manifestArgs = @("scripts/updates-manifest.js", "--version", $ver)
+          if ($haveBase) { $manifestArgs += @("--base", $base) }
+          $manifestArgs += @(
+            "--platform", "windows-x86_64=$($nsis.FullName)",
+            "--out", (Join-Path $out "updates.json")
+          )
+          node @manifestArgs
+          if ($LASTEXITCODE -ne 0) { throw "updates.json generation failed" }
+
+          # Refuse to publish a manifest the installed app would reject.
+          $manifest = Get-Content (Join-Path $out "updates.json") -Raw | ConvertFrom-Json
+          if (-not $manifest.platforms.'windows-x86_64') {
+            throw "updates.json has no windows-x86_64 entry"
+          }
+
+          gh release upload $tag --repo Just-Me-Media/FreeLLMAPI-Roundtable --clobber `
+            (Join-Path $out "updates.json")
+          if ($LASTEXITCODE -ne 0) { throw "failed to upload updates.json" }
+
+          Write-Host "Published updates.json for $tag with platforms:"
+          $manifest.platforms.PSObject.Properties.Name | ForEach-Object { Write-Host "  - $_" }

@@ -19,14 +19,25 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$PROJECT_DIR"
 
 NOTARY_PROFILE="${NOTARY_PROFILE:-roundtable-notary}"
-APP="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Roundtable.app"
-DMG="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Roundtable_0.2.0_aarch64.dmg"
-BUNDLE_DMG="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/bundle_dmg.sh"
+
+# Resolve arch/version so this works on Apple Silicon and Intel alike.
+RAW_ARCH="$(uname -m)"
+case "$RAW_ARCH" in
+  arm64|aarch64) ARCH="aarch64" ;;
+  x86_64)        ARCH="x86_64"  ;;
+  *)             ARCH="$RAW_ARCH" ;;
+esac
+TARGET="${ARCH}-apple-darwin"
+VERSION="$(python3 -c "import json; print(json.load(open('src-tauri/tauri.conf.json'))['version'])")"
+
+APP="src-tauri/target/${TARGET}/release/bundle/macos/Roundtable.app"
+DMG="src-tauri/target/${TARGET}/release/bundle/dmg/Roundtable_${VERSION}_${ARCH}.dmg"
+BUNDLE_DMG="src-tauri/target/${TARGET}/release/bundle/dmg/bundle_dmg.sh"
 ENTITLEMENTS="src-tauri/entitlements.plist"
 
 # ---------- sanity ----------
-[ -d "$APP" ] || { echo "❌ $APP not found. Run: cargo tauri build --target aarch64-apple-darwin"; exit 1; }
-[ -f "$DMG" ] || { echo "❌ $DMG not found. Run: cargo tauri build --target aarch64-apple-darwin"; exit 1; }
+[ -d "$APP" ] || { echo "❌ $APP not found. Run: cargo tauri build --target $TARGET"; exit 1; }
+[ -f "$DMG" ] || { echo "❌ $DMG not found. Run: cargo tauri build --target $TARGET"; exit 1; }
 
 # ---------- identity ----------
 # Multiple Developer ID certs can share an identical CN, which makes
@@ -103,7 +114,7 @@ notary_history() {
 }
 
 echo ""
-echo "=== 0/6 Preflight: notary credentials ==="
+echo "=== 0/8 Preflight: notary credentials ==="
 PREFLIGHT=$(notary_history)
 if echo "$PREFLIGHT" | grep -q "HTTP status code: 401"; then
   cat <<EOF
@@ -137,9 +148,37 @@ EOF
 fi
 echo "✅ Credentials accepted by Apple"
 
+# Transient 403s happen on the first call after idle; retry. A completed
+# submission with status Invalid is a hard failure so we surface the log.
+notarize() {
+  local artifact="$1" label="$2" attempt out sid
+  echo ""
+  echo "=== $label ==="
+  echo "    artifact: $artifact"
+  for attempt in 1 2 3 4 5; do
+    out=$(xcrun notarytool submit "$artifact" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1 || true)
+    printf '%s\n' "$out" | tail -8
+    if printf '%s\n' "$out" | grep -q "status: Accepted"; then
+      return 0
+    fi
+    if printf '%s\n' "$out" | grep -q "status: Invalid"; then
+      sid=$(printf '%s\n' "$out" | sed -n 's/^ *id: *//p' | tail -1)
+      echo ""
+      echo "❌ Apple rejected $artifact (status: Invalid)."
+      echo "   Submission ID: ${sid:-unknown}"
+      [ -n "$sid" ] && xcrun notarytool log "$sid" --keychain-profile "$NOTARY_PROFILE" 2>/dev/null | head -60
+      return 1
+    fi
+    echo "   attempt $attempt failed; retrying in 5s…"
+    sleep 5
+  done
+  echo "❌ Notarization of $artifact failed after 5 attempts."
+  return 1
+}
+
 # ---------- sign app ----------
 echo ""
-echo "=== 1/7 Signing .app (hardened runtime + secure timestamp) ==="
+echo "=== 1/8 Signing .app (hardened runtime + secure timestamp) ==="
 codesign --force --deep --options runtime --timestamp \
   --entitlements "$ENTITLEMENTS" \
   --sign "$SIGN_IDENTITY" "$APP"
@@ -147,7 +186,7 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 
 # ---------- verify hardened runtime, timestamp, entitlements survived ----------
 echo ""
-echo "=== 2/7 Verifying signature properties ==="
+echo "=== 2/8 Verifying signature properties ==="
 SIGINFO=$(codesign -dv --verbose=4 "$APP" 2>&1)
 echo "$SIGINFO" | grep -E "Authority=|TeamIdentifier=" | head -4
 echo "$SIGINFO" | grep -q "flags=.*runtime" \
@@ -159,14 +198,32 @@ echo "$SIGINFO" | grep -q "^Timestamp=" \
 ENT_CNT=$(codesign -d --entitlements :- "$APP" 2>/dev/null | grep -c "com.apple.security" || true)
 echo "   ✅ entitlements present: $ENT_CNT"
 
-# ---------- rebuild dmg FROM THE SIGNED APP ----------
+# ---------- notarize the app bundle FIRST ----------
+# A ticket is bound to the exact artifact that was notarized. Notarizing only
+# the DMG staples the ticket to the DMG, so once the user drags Roundtable.app
+# to /Applications the ticket is left behind on the mounted image and an
+# offline first launch is rejected. Notarizing + stapling the .app first means
+# the copy inside the DMG carries its own ticket.
+echo ""
+echo "=== 3/8 Notarizing .app ==="
+APP_ZIP_DIR=$(mktemp -d)
+APP_ZIP="$APP_ZIP_DIR/Roundtable.zip"
+trap 'rm -rf "$APP_ZIP_DIR" "${STAGING:-}"' EXIT
+ditto -c -k --keepParent "$APP" "$APP_ZIP"
+notarize "$APP_ZIP" "Submitting .app to Apple Notary Service"
+
+echo ""
+echo "=== 4/8 Stapling .app ==="
+xcrun stapler staple "$APP"
+xcrun stapler validate "$APP"
+
+# ---------- rebuild dmg FROM THE STAPLED, SIGNED APP ----------
 # Critical: `cargo tauri build` seals the DMG before we sign, so the DMG would
 # otherwise ship an adhoc-signed app and Apple rejects it. Rebuild it here.
 echo ""
-echo "=== 3/7 Rebuilding .dmg from signed .app ==="
+echo "=== 5/8 Rebuilding .dmg from stapled .app ==="
 [ -f "$BUNDLE_DMG" ] || { echo "❌ $BUNDLE_DMG not found (run cargo tauri build first)"; exit 1; }
 STAGING=$(mktemp -d)
-trap 'rm -rf "$STAGING"' EXIT
 cp -R "$APP" "$STAGING/"
 rm -f "$DMG"
 bash "$BUNDLE_DMG" \
@@ -181,7 +238,7 @@ bash "$BUNDLE_DMG" \
   "$DMG" "$STAGING" >/dev/null
 [ -f "$DMG" ] || { echo "❌ DMG rebuild failed"; exit 1; }
 
-# Confirm the copy inside the DMG is really signed (catches the classic mistake).
+# Confirm the copy inside the DMG is really signed and stapled.
 echo "   verifying app inside DMG…"
 MP=$(mktemp -d)
 hdiutil attach -nobrowse -readonly -mountpoint "$MP" "$DMG" >/dev/null 2>&1
@@ -191,59 +248,34 @@ else
   hdiutil detach "$MP" >/dev/null 2>&1
   echo "   ❌ app inside DMG failed signature verification"; exit 1
 fi
+if xcrun stapler validate "$MP/Roundtable.app" >/dev/null 2>&1; then
+  echo "   ✅ app inside DMG carries its own stapled ticket"
+else
+  hdiutil detach "$MP" >/dev/null 2>&1
+  echo "   ❌ app inside DMG has no stapled ticket (offline launch would fail)"; exit 1
+fi
 hdiutil detach "$MP" >/dev/null 2>&1
 rmdir "$MP" 2>/dev/null || true
 
 # ---------- sign dmg ----------
 echo ""
-echo "=== 4/7 Signing .dmg ==="
+echo "=== 6/8 Signing .dmg ==="
 codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
 
-# ---------- notarize ----------
+# ---------- notarize dmg ----------
 echo ""
-echo "=== 5/7 Submitting to Apple Notary Service ==="
 echo "    profile: $NOTARY_PROFILE"
-# Transient 403s happen on the first call after idle; retry. Also treat a
-# completed submission with status Invalid as a failure so we surface logs.
-SUBMIT_OK=0
-for attempt in 1 2 3 4 5; do
-  OUT=$(xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait 2>&1 || true)
-  printf '%s\n' "$OUT" | tail -8
-  if printf '%s\n' "$OUT" | grep -q "status: Accepted"; then
-    SUBMIT_OK=1
-    break
-  fi
-  if printf '%s\n' "$OUT" | grep -q "status: Invalid"; then
-    SID=$(printf '%s\n' "$OUT" | sed -n 's/^ *id: *//p' | tail -1)
-    echo ""
-    echo "❌ Apple rejected the archive (status: Invalid)."
-    echo "   Submission ID: ${SID:-unknown}"
-    [ -n "$SID" ] && xcrun notarytool log "$SID" --keychain-profile "$NOTARY_PROFILE" 2>/dev/null | head -60
-    exit 1
-  fi
-  echo "   attempt $attempt failed; retrying in 5s…"
-  sleep 5
-done
-[ "$SUBMIT_OK" -eq 1 ] || { echo "❌ Notarization failed after 5 attempts."; exit 1; }
+notarize "$DMG" "7/8 Submitting .dmg to Apple Notary Service"
 
 # ---------- staple ----------
 echo ""
-echo "=== 6/7 Stapling ticket ==="
+echo "=== 8/8 Stapling .dmg ticket ==="
 xcrun stapler staple "$DMG"
 xcrun stapler validate "$DMG"
 
-# The app bundle's CDHash is part of the accepted submission, so it can carry
-# the same ticket. This makes the on-disk build valid offline too (e.g. when
-# installed straight to /Applications rather than dragged out of the DMG).
-if xcrun stapler staple "$APP" >/dev/null 2>&1; then
-  echo "   ✅ .app also stapled (offline-valid)"
-else
-  echo "   ⚠️  could not staple .app (DMG staple is authoritative)"
-fi
-
 # ---------- gatekeeper ----------
 echo ""
-echo "=== 7/7 Gatekeeper assessment ==="
+echo "=== Gatekeeper assessment ==="
 spctl -a -t open --context context:primary-signature -v "$DMG"
 
 echo ""

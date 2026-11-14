@@ -5,7 +5,7 @@
   "identifier": "media.justme.roundtable",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyQjBGMTM3MEYxRjRDOUQKUldTZFRCOFBOL0d3MHVxOU00OVEvYkFKTXk2NGZCSERSNnBEc0tBV29DM0MyeVR1WjJZQnp6NUQK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFOEM5OUQ3MUQ5QjJCNUEKUldSYUs1c2QxNW1NYnVZTW0wVmRqRUNudmpSTjNhc2pVMVdTcFVMOU9pYUpiV0JUZHFXeGlzRFoK"
     }
   },
   "build": {

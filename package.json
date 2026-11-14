@@ -8,12 +8,13 @@
     "start": "node server.js",
     "build:mac": "RUSTC_WRAPPER='' cargo tauri build --bundles app",
     "build:dmg": "./scripts/build-and-notarize.sh",
-    "build:windows": "powershell -ExecutionPolicy Bypass -File .\build-windows.ps1",
+    "build:windows": "powershell -ExecutionPolicy Bypass -File .\\build-windows.ps1",
     "test": "node test/e2e.js",
     "smoke": "node test/smoke.js",
     "screenshots": "node test/screenshots.js",
     "verify": "bash scripts/verify-install.sh",
-    "build:install": "RUSTC_WRAPPER='' cargo tauri build --bundles app && bash scripts/install-app.sh"
+    "build:install": "RUSTC_WRAPPER='' cargo tauri build --bundles app && bash scripts/install-app.sh",
+    "manifest": "node scripts/updates-manifest.js"
   },
   "engines": {
     "node": ">=18"
