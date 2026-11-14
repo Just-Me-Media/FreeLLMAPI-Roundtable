@@ -23,7 +23,8 @@ case "$RAW_ARCH" in
   x86_64)        ARCH="x86_64"  ;;
   *)             ARCH="$RAW_ARCH" ;;
 esac
-TARGET="${ARCH}-apple-darwin"
+TARGET="${ARCH}-apple-darwin"          # Rust build target
+UPDATER_TARGET="darwin-${ARCH}"        # key the updater plugin looks up
 DMG="src-tauri/target/${TARGET}/release/bundle/dmg/Roundtable_${VERSION}_${ARCH}.dmg"
 TAG="v${VERSION}"
 RELEASE_DIR="releases/${TAG}"
@@ -47,7 +48,7 @@ cp "$DMG" "$RELEASE_DIR/"
 node scripts/updates-manifest.js \
   --version "$VERSION" \
   --base "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/latest/download/updates.json" \
-  --platform "${TARGET}=${RELEASE_DIR}/$(basename "$DMG")" \
+  --platform "${UPDATER_TARGET}=${RELEASE_DIR}/$(basename "$DMG")" \
   --out "${RELEASE_DIR}/updates.json"
 
 echo ""
