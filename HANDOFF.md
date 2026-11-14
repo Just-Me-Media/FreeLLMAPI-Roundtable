@@ -33,31 +33,26 @@
   - The published installer is byte-identical to the locally built and tested one (SHA-256 `456BF28B02E66BC5B6AAFF666D5E26C9C44EA13AD74360F9D6609B4A9465B873`).
   - In-app `updater.check()` returns `null` without error (app is already 0.2.1), so the endpoint is live and the manifest parses.
 
-  **How Windows is published (no self-hosted runner required):**
-  1. Build locally: `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1`
-  2. Attach the installers to the release:
+  **Release process (one path, used locally and in CI):**
+  1. Bump `version` in `src-tauri/tauri.conf.json` (and `package.json`), commit, push.
+  2. Tag it: `git tag v<version>; git push origin v<version>` (the workflow will create the tag if you skip this).
+  3. Run **Release Windows** (`.github/workflows/release.yml`):
      ```powershell
-     gh release upload v0.2.1 `
-       src-tauri\target\release\bundle\nsis\Roundtable_0.2.1_x64-setup.exe `
-       src-tauri\target\release\bundle\msi\Roundtable_0.2.1_x64_en-US.msi `
-       --repo Just-Me-Media/FreeLLMAPI-Roundtable --clobber
+     gh workflow run release.yml `
+       --repo Just-Me-Media/FreeLLMAPI-Roundtable --ref v0.2.1
      ```
-  3. Dispatch **Sign Windows Release** (`.github/workflows/sign-windows-release.yml`) with
-     `tag=v0.2.1` and `asset=Roundtable_0.2.1_x64-setup.exe`:
-     ```powershell
-     gh workflow run sign-windows-release.yml `
-       --repo Just-Me-Media/FreeLLMAPI-Roundtable `
-       --ref main -f tag=v0.2.1 -f asset=Roundtable_0.2.1_x64-setup.exe
-     ```
-     The job downloads the asset, signs it with the repo secret
-     `TAURI_SIGNING_PRIVATE_KEY`, merges the `windows-x86_64` entry into the
-     release's `updates.json` (keeping `darwin-aarch64`) and re-uploads it.
-
-  **Why not `.github/workflows/release.yml`?** It targets
-  `runs-on: [self-hosted, Windows]`, but this repo has **0 registered runners**
-  and the workflow is currently `disabled_manually`. The private key exists only
-  as the repo secret, so signing must happen inside Actions. GitHub Actions
-  minutes are free for public repositories, so the sign job costs nothing.
+     It runs `build-windows.ps1` on `windows-latest` (the same script the
+     ThinkCentre uses), signs the NSIS installer with the
+     `TAURI_SIGNING_PRIVATE_KEY` secret, merges the `windows-x86_64` entry into
+     the release's `updates.json` (keeping `darwin-aarch64`) and publishes the
+     NSIS + MSI installers.
+  - The tag is derived from `tauri.conf.json`, so a tag can never disagree with
+    the binaries inside it. Dispatching a branch whose tag already points at
+    other code fails on purpose.
+  - Local build for testing (no publishing):
+    `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1`
+  - GitHub Actions minutes are free for public repositories, so this costs
+    nothing.
 
   **Key gotcha:** `src-tauri/updater.key` in this checkout is **stale**
   (key id `13FADAED9706926B`) and does NOT match the pubkey baked into the app.

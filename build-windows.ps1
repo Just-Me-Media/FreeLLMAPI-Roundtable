@@ -4,10 +4,13 @@
 #   powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
 #
 # Prerequisites on the Windows machine:
-#   - Rust toolchain (rustup / cargo) in PATH
 #   - Node.js 18+ in PATH
-#   - cargo-tauri installed: cargo install tauri-cli
+#   - npm ci run once in the repo root (provides the pinned Tauri CLI)
+#   - Rust toolchain (rustup / cargo) in PATH
 #   - FreeLLMAPI running on localhost:31415 (needed at runtime, not build time)
+#
+# This is the ONLY Windows build path: CI runs this same script, so a local
+# build and a released build differ only by compiler nondeterminism.
 
 param(
     [string]$Config = "windows",
@@ -23,13 +26,26 @@ Write-Host "Root: $Root"
 Write-Host "Config: $Config"
 
 # 0. Sanity checks
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Write-Error "node not found in PATH. Install Node.js 18+: https://nodejs.org"
+    exit 1
+}
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
     Write-Error "cargo not found in PATH. Install Rust: https://rustup.rs"
     exit 1
 }
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
-    Write-Error "node not found in PATH. Install Node.js 18+: https://nodejs.org"
-    exit 1
+
+# Prefer the project-pinned Tauri CLI so local and CI builds use the exact
+# same version. Fall back to a globally installed cargo-tauri.
+$LocalTauri = Join-Path $Root "node_modules\.bin\tauri.cmd"
+if (Test-Path $LocalTauri) {
+    $TauriExe = $LocalTauri
+    $TauriArgs = @()
+    Write-Host "Tauri CLI: project ($LocalTauri)"
+} else {
+    $TauriExe = "cargo"
+    $TauriArgs = @("tauri")
+    Write-Host "Tauri CLI: cargo tauri (global)" -ForegroundColor Yellow
 }
 
 # 1. Ensure frontend dist exists (Tauri needs ../dist/index.html AND ../dist/src/)
@@ -76,20 +92,21 @@ if (-not (Test-Path $ConfPath)) {
 }
 
 # 3. Build
-Write-Host "Running: cargo tauri build --config $ConfFile" -ForegroundColor Yellow
+Write-Host "Running: tauri build --config $ConfFile" -ForegroundColor Yellow
 Set-Location $SrcTauri
-cargo tauri build --config $ConfFile
+& $TauriExe @TauriArgs build --config $ConfFile
 if ($LASTEXITCODE -ne 0) {
-    Write-Error "cargo tauri build failed (exit $LASTEXITCODE)"
+    Write-Error "tauri build failed (exit $LASTEXITCODE)"
     exit $LASTEXITCODE
 }
 
 # 4. Report artifacts
+$Version = (Get-Content (Join-Path $SrcTauri "tauri.conf.json") -Raw | ConvertFrom-Json).version
 $Bundle = Join-Path $SrcTauri "target\release\bundle"
-Write-Host "`n=== Build artifacts ===" -ForegroundColor Green
+Write-Host "`n=== Build artifacts for $Version ===" -ForegroundColor Green
 $found = $false
 Get-ChildItem $Bundle -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.Extension -in ".exe", ".msi" } |
+    Where-Object { $_.Extension -in ".exe", ".msi" -and $_.Name -like "*_$Version*" } |
     ForEach-Object {
         $found = $true
         $size = [math]::Round($_.Length / 1MB, 2)

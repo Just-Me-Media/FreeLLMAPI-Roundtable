@@ -1,57 +1,107 @@
-name: Release Desktop Apps
+name: Release Windows
 
-# Windows releases are built on the self-hosted ThinkCentre runner.
-# macOS releases are built + notarized locally with:
-#   ./scripts/build-and-notarize.sh
+# Builds, signs and publishes the Windows desktop release.
 #
-# Both platforms publish a SINGLE shared updates.json. Whichever job runs
-# second merges its platform entry into the manifest already on the release,
-# so macOS users never lose their update path when Windows ships (and vice
-# versa). The manifest must be attached to the release, otherwise
-# releases/latest/download/updates.json 404s and auto-update is dead.
+# The release tag is DERIVED from src-tauri/tauri.conf.json, so a tag can never
+# disagree with the binaries inside it. Publish by dispatching against the tag:
+#
+#   gh workflow run release.yml --ref v0.2.1
+#
+# or against a branch whose version is not tagged yet (the tag is created at
+# that commit). Dispatching a branch whose tag already points at different code
+# fails on purpose.
+#
+# macOS is built and notarized locally (scripts/build-and-notarize.sh) and
+# publishes its own darwin-aarch64 entry. This job MERGES its windows-x86_64
+# entry into the manifest already attached to the release, so neither platform
+# can erase the other's update path.
+#
+# Requires the repo secret TAURI_SIGNING_PRIVATE_KEY (key id 6E8C99D71D9B2B5A)
+# and, only if that key is password protected,
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
 
 on:
   workflow_dispatch:
 
-jobs:
-  build-windows:
-    name: Build Windows on ThinkCentre
-    runs-on: [self-hosted, Windows]
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+permissions:
+  contents: write
 
-      - name: Read version
-        id: v
+concurrency:
+  group: release-windows
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Build and publish Windows
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    env:
+      REPO: ${{ github.repository }}
+
+    steps:
+      - name: Check out the release ref
+        uses: actions/checkout@v4
+        with:
+          # Tags are needed to prove that the tag matches the built commit.
+          fetch-depth: 0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Read version and validate the tag
+        id: meta
         shell: pwsh
         run: |
-          $v = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          if ($v -notmatch '^\d+\.\d+\.\d+') { throw "Unexpected version in tauri.conf.json: $v" }
-          "version=$v" >> $env:GITHUB_OUTPUT
-          "tag=v$v" >> $env:GITHUB_OUTPUT
-          Write-Host "Release: v$v"
+          $ErrorActionPreference = "Stop"
 
-      # tauri-action runs `cargo tauri build --config <windows config>`, which
-      # executes the PowerShell beforeBuildCommand that rebuilds dist/src/.
-      # It also creates/updates the GitHub release and uploads the bundles.
-      - name: Build and upload Windows bundles
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: './'
-          args: --config src-tauri/tauri.windows.conf.json
-          tagName: v__VERSION__
-          releaseName: 'Roundtable v__VERSION__'
-          releaseBody: 'Roundtable desktop application release.'
-          releaseDraft: false
-          prerelease: false
-          # We merge the manifest ourselves so macOS + Windows coexist.
-          includeUpdaterJson: false
+          $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Unexpected version in tauri.conf.json: '$version'"
+          }
+          $tag = "v$version"
 
-      - name: Sign installer and merge updates.json
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            if ($env:GITHUB_REF_NAME -ne $tag) {
+              throw "Dispatched from tag '$env:GITHUB_REF_NAME' but tauri.conf.json says $version (expected $tag)."
+            }
+            Write-Host "Releasing tag $tag (matches tauri.conf.json)."
+          } else {
+            $existing = git tag --list $tag
+            if ($existing) {
+              $tagCommit = (git rev-list -n 1 $tag).Trim()
+              $head = (git rev-parse HEAD).Trim()
+              if ($tagCommit -ne $head) {
+                throw "Tag $tag already points at $tagCommit but HEAD is $head. Bump the version in tauri.conf.json, or dispatch against $tag."
+              }
+              Write-Host "Tag $tag already points at HEAD."
+            } else {
+              Write-Host "Tag $tag does not exist yet; it will be created at this commit."
+            }
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Build Windows bundles
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -ExecutionPolicy Bypass -File .\build-windows.ps1
+          if ($LASTEXITCODE -ne 0) { throw "build-windows.ps1 failed (exit $LASTEXITCODE)" }
+
+      - name: Sign and publish
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -59,45 +109,75 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           $ErrorActionPreference = "Stop"
-          $tag = "${{ steps.v.outputs.tag }}"
-          $ver = "${{ steps.v.outputs.version }}"
-          $out = Join-Path "releases" $tag
-          New-Item -ItemType Directory -Force $out | Out-Null
+          $tag = "${{ steps.meta.outputs.tag }}"
+          $version = "${{ steps.meta.outputs.version }}"
 
           if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
-            throw "TAURI_SIGNING_PRIVATE_KEY secret is not set — cannot sign the update."
+            throw "TAURI_SIGNING_PRIVATE_KEY repo secret is not set - cannot sign the update."
           }
 
-          # Pull the manifest already attached to this release (may not exist
-          # if Windows is the first platform to publish this version).
-          gh release download $tag --repo Just-Me-Media/FreeLLMAPI-Roundtable `
-            --pattern updates.json --dir $out 2>$null
-          $base = Join-Path $out "updates.json"
-          $haveBase = Test-Path $base
-
-          # Tauri's updater consumes the NSIS installer on Windows (not the MSI).
-          $nsis = Get-ChildItem "src-tauri\target\release\bundle\nsis\*-setup.exe" -ErrorAction SilentlyContinue |
+          $nsis = Get-ChildItem "src-tauri\target\release\bundle\nsis\*_${version}_x64-setup.exe" -ErrorAction SilentlyContinue |
             Select-Object -First 1
-          if (-not $nsis) { throw "NSIS installer not found under src-tauri\target\release\bundle\nsis" }
+          if (-not $nsis) { throw "NSIS installer for $version not found under src-tauri\target\release\bundle\nsis" }
 
-          $manifestArgs = @("scripts/updates-manifest.js", "--version", $ver)
-          if ($haveBase) { $manifestArgs += @("--base", $base) }
-          $manifestArgs += @(
-            "--platform", "windows-x86_64=$($nsis.FullName)",
-            "--out", (Join-Path $out "updates.json")
-          )
-          node @manifestArgs
-          if ($LASTEXITCODE -ne 0) { throw "updates.json generation failed" }
+          $msi = Get-ChildItem "src-tauri\target\release\bundle\msi\*_${version}_x64_en-US.msi" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if (-not $msi) { throw "MSI for $version not found under src-tauri\target\release\bundle\msi" }
 
-          # Refuse to publish a manifest the installed app would reject.
-          $manifest = Get-Content (Join-Path $out "updates.json") -Raw | ConvertFrom-Json
-          if (-not $manifest.platforms.'windows-x86_64') {
-            throw "updates.json has no windows-x86_64 entry"
+          Write-Host "NSIS: $($nsis.FullName)  ($($nsis.Length) bytes)"
+          Write-Host "MSI : $($msi.FullName)  ($($msi.Length) bytes)"
+
+          # Create the release if this is a brand new version.
+          gh release view $tag --repo $env:REPO *> $null
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Creating release $tag"
+            gh release create $tag --repo $env:REPO `
+              --title "Roundtable $tag" `
+              --notes "Roundtable desktop release $tag."
+            if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
           }
 
-          gh release upload $tag --repo Just-Me-Media/FreeLLMAPI-Roundtable --clobber `
-            (Join-Path $out "updates.json")
+          # The manifest already on the release (keeps darwin-aarch64 alive).
+          $out = Join-Path "releases" $tag
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $manifestPath = Join-Path $out "updates.json"
+          $base = $null
+          gh release download $tag --repo $env:REPO --pattern updates.json --dir $out --clobber *> $null
+          if (Test-Path $manifestPath) {
+            $base = Get-Content $manifestPath -Raw | ConvertFrom-Json
+            Write-Host "Base manifest: v$($base.version) with platforms $($base.platforms.PSObject.Properties.Name -join ', ')"
+            if ([version]$base.version -gt [version]$version) {
+              throw "Published manifest is v$($base.version) but this build is v$version - refusing to downgrade."
+            }
+          } else {
+            Write-Host "No published manifest yet - starting a fresh one."
+          }
+
+          $manifestArgs = @("scripts/updates-manifest.js", "--version", $version)
+          if ($base) { $manifestArgs += @("--base", $manifestPath) }
+          $manifestArgs += @("--platform", "windows-x86_64=$($nsis.FullName)")
+          $manifestArgs += @("--out", $manifestPath)
+          node @manifestArgs
+          if ($LASTEXITCODE -ne 0) { throw "updates-manifest.js failed" }
+
+          # Never publish a manifest the apps would reject or that silently
+          # drops the other platform.
+          $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+          if (-not $manifest.platforms.'windows-x86_64') {
+            throw "Manifest has no windows-x86_64 entry."
+          }
+          if ($base -and $base.platforms.'darwin-aarch64' -and -not $manifest.platforms.'darwin-aarch64') {
+            throw "Manifest lost the darwin-aarch64 entry."
+          }
+
+          # Installers first, manifest last: the manifest must never point at
+          # an asset that is not there yet.
+          gh release upload $tag --repo $env:REPO --clobber $nsis.FullName $msi.FullName
+          if ($LASTEXITCODE -ne 0) { throw "failed to upload installers" }
+
+          gh release upload $tag --repo $env:REPO --clobber $manifestPath
           if ($LASTEXITCODE -ne 0) { throw "failed to upload updates.json" }
 
-          Write-Host "Published updates.json for $tag with platforms:"
+          Write-Host ""
+          Write-Host "Published $tag with platforms:"
           $manifest.platforms.PSObject.Properties.Name | ForEach-Object { Write-Host "  - $_" }

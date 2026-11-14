@@ -107,13 +107,25 @@ function findSignerKey(args) {
 }
 
 function tauriCli() {
+  // Prefer the project-pinned CLI (node_modules) so the signature is produced
+  // by the same version that built the app. Invoke its JS entry point through
+  // the current node binary: this works identically on Windows and Unix and
+  // avoids the `.cmd` shim, which Node refuses to execute without a shell.
+  const cliJs = path.join('node_modules', '@tauri-apps', 'cli', 'tauri.js');
+  if (fs.existsSync(cliJs)) {
+    const cli = { cmd: process.execPath, args: [cliJs] };
+    try {
+      execFileSync(cli.cmd, [...cli.args, '--version'], { stdio: 'ignore' });
+      return cli;
+    } catch {}
+  }
   for (const [cmd, args] of [['cargo', ['tauri']], ['npx', ['--no-install', 'tauri']]]) {
     try {
-      execFileSync(cmd, [...args, '--version'], { stdio: 'ignore' });
+      execFileSync(cmd, [...args, '--version'], { stdio: 'ignore', shell: process.platform === 'win32' });
       return { cmd, args };
     } catch {}
   }
-  die('tauri CLI not found. Install it with `cargo install tauri-cli` or add @tauri-apps/cli to the project.');
+  die('tauri CLI not found. Run `npm ci` in the repo root, or install `cargo install tauri-cli`.');
 }
 
 function signFile(file, keyPath, password) {
