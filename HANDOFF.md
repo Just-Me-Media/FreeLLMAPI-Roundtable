@@ -64,6 +64,11 @@
   Never sign a release with it — the app would reject the update. The only valid
   private key is the `TAURI_SIGNING_PRIVATE_KEY` repo secret.
 
+  **One-time migration:** the signing key was rotated in 0.2.1 (old key id
+  `D2B0F1370F1F4C9D`). Builds of **0.2.0 and older will reject the 0.2.1 update**
+  because they still trust the old key, so anyone on 0.2.0 must install 0.2.1
+  manually once. From 0.2.1 onward auto-update works normally.
+
 ## Build checklist (Windows ThinkCentre)
 
 1. Node server test
