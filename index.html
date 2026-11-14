@@ -968,7 +968,7 @@
 
       <div class="tabs">
         <button class="tab-btn" data-tab="tab-local">🏠 Local Models</button>
-        <button class="tab-btn" data-tab="tab-cloud">☁️ Cloud & FreeLLMAPI</button>
+        <button class="tab-btn" data-tab="tab-cloud">☁️ Cloud Models</button>
         <button class="tab-btn active" data-tab="tab-rules">⚙️ Turn Rules</button>
       </div>
 
@@ -996,50 +996,74 @@
 
       <!-- CLOUD MODELS TAB -->
       <div class="tab-body" id="tab-cloud">
+        <p class="hint" style="margin:4px 0 12px">Pick a provider, enter your key, and load models into your lineup. Keys stay in your browser only.</p>
+
+        <!-- Provider selector -->
         <div class="field">
-          <label for="freellmUrl">FreeLLMAPI Base URL</label>
+          <label for="cloudProvider">Provider</label>
+          <select id="cloudProvider">
+            <option value="openrouter">OpenRouter (free &amp; paid models)</option>
+            <option value="groq">Groq (fast, free tier)</option>
+            <option value="gemini">Google Gemini (AI Studio)</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic (Claude)</option>
+            <option value="gateway">OpenAI-compatible gateway (FreeLLMAPI, LiteLLM, etc.)</option>
+          </select>
+        </div>
+
+        <!-- Gateway URL — only shown for "gateway" provider -->
+        <div class="field" id="gatewayUrlField" style="display:none;margin-top:8px">
+          <label for="freellmUrl">Gateway Base URL</label>
           <div style="display:flex;gap:6px">
-            <input type="text" id="freellmUrl" placeholder="http://127.0.0.1:31415 or http://127.0.0.1:3001"
+            <input type="text" id="freellmUrl" placeholder="http://127.0.0.1:31415"
               style="flex:1">
-            <button class="btn" id="btnDetectBase">🔍 Auto-detect</button>
+            <button class="btn" id="btnDetectBase">&#x1F50D; Auto-detect</button>
           </div>
+          <span class="hint" style="margin-top:3px">Must expose a <code>/v1/models</code> and <code>/v1/chat/completions</code> endpoint.</span>
         </div>
-        <div class="field" style="margin-top:8px">
-          <label for="key">FreeLLMAPI Unified Key (starts with freellmapi-)</label>
-          <input type="password" id="key" placeholder="freellmapi-…" autocomplete="off">
+
+        <!-- Provider key -->
+        <div class="field" id="cloudKeyField" style="margin-top:8px">
+          <label for="directKey" id="cloudKeyLabel">API Key</label>
+          <input type="password" id="directKey" placeholder="" autocomplete="off">
+          <div class="quick-links" id="cloudKeyLinks" style="margin-top:4px"></div>
         </div>
-        <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:2px 0 4px;cursor:pointer;">
-          <input type="checkbox" id="persistKey"> Keep key in localStorage (unchecked = session only)
+
+        <!-- Legacy gateway key — only shown for "gateway" provider -->
+        <div class="field" id="gatewayKeyField" style="display:none;margin-top:4px">
+          <label for="key">Gateway Key (optional)</label>
+          <input type="password" id="key" placeholder="e.g. freellmapi-..." autocomplete="off">
+        </div>
+
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:8px 0 4px;cursor:pointer;">
+          <input type="checkbox" id="persistKey"> Keep keys in localStorage (unchecked = session only)
         </label>
-        <div class="row" style="display:flex;gap:8px;margin:6px 0 12px">
-          <button class="btn primary" id="btnLoad">Load FreeLLMAPI Models</button>
+
+        <div class="row" style="display:flex;gap:8px;margin:8px 0 12px;flex-wrap:wrap;">
+          <button class="btn primary" id="btnLoad">Load Models</button>
+          <button class="btn" id="btnValidate">Validate Lineup</button>
           <span class="note" id="loadNote" style="align-self:center"></span>
         </div>
-        <div class="row" style="display:flex;gap:8px;margin:6px 0 12px">
-          <button class="btn" id="btnValidate">Validate Lineup Models</button>
-        </div>
 
-        <div class="field">
-          <label for="directKey">Direct Provider Key (OpenRouter, Groq, etc.)</label>
-          <input type="password" id="directKey" placeholder="sk-or-... or gsk_...">
-          <div class="quick-links">
-            <span>Free keys:</span>
-            <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a>
-            <a href="https://console.groq.com/keys" target="_blank">Groq</a>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>
-          </div>
-        </div>
-
-        <div class="field" style="margin-top:10px">
-          <label for="search">Available Cloud Models</label>
-          <input type="text" id="search" placeholder="Search model ids…">
+        <div class="field" style="margin-top:4px">
+          <label for="search">Available Models</label>
+          <input type="text" id="search" placeholder="Search model IDs...">
         </div>
         <div class="modellist" id="modellist">
-          <div class="modelitem"><span class="note">Click "Load FreeLLMAPI Models" first.</span></div>
+          <div class="modelitem"><span class="note">Select a provider and click "Load Models".</span></div>
+        </div>
+
+        <!-- Manual model entry for providers that don't expose /v1/models -->
+        <div class="field" style="margin-top:12px">
+          <label for="manualCloudModel" style="font-size:13px">Or add a model ID manually</label>
+          <div style="display:flex;gap:6px">
+            <input type="text" id="manualCloudModel" placeholder="e.g. gpt-4o or claude-3-5-sonnet-20241022" style="flex:1">
+            <button class="btn" id="btnAddManualCloud">Add</button>
+          </div>
+          <span class="hint" id="manualCloudHint" style="margin-top:3px"></span>
         </div>
       </div>
-
-      <!-- TURN RULES TAB -->
+            <!-- TURN RULES TAB -->
       <div class="tab-body active" id="tab-rules">
         <div class="field">
           <label for="rounds">Rounds per message</label>
@@ -1104,7 +1128,7 @@
         <span class="spacer"></span>
         <button class="btn" id="btnCloseTemplates">✕</button>
       </div>
-      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and assigns template-specific roles to each model slot (slot 1 = drafter/outline, slot 2 = critic, last = synthesizer).</p>
+      <p class="hint" style="margin:4px 0 10px">Pre-configure the table for a specific output type. Applies a shared preamble and assigns template-specific roles to each model slot. Each slot gets its own role; extra slots cycle through the template roles.</p>
       <div id="templatesList"></div>
     </div>
   </div>
@@ -1131,6 +1155,34 @@
     </div>
   </div>
 
+  <script type="module">
+    // Storage architecture initialization
+    import { StorageFactory } from './src/index.js';
+
+    async function initializeStorage() {
+      try {
+        const { storage, configManager, chatManager, artifactManager, syncManager } = await StorageFactory.initialize();
+
+        window.storage = {
+          storage,
+          configManager,
+          chatManager,
+          artifactManager,
+          syncManager
+        };
+
+        console.log('[Storage Integration] Storage architecture initialized successfully');
+      } catch (error) {
+        console.error('[Storage Integration] Failed to initialize storage:', error);
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeStorage);
+    } else {
+      initializeStorage();
+    }
+  </script>
   <script>
 // Official Tauri v2 HTTP Plugin Client & Global fetch Interceptor
 var __TAURI_PLUGIN_HTTP__ = (function() {
@@ -1311,6 +1363,10 @@ try {
         { id: 'outline', label: 'Draft initial outline', value: 'You are responsible for drafting the initial high-level outline and structure. Identify key components and logical flow before detailed implementation.' },
         { id: 'critique', label: 'Critique and find flaws', value: 'You are the critical reviewer. Identify weaknesses, potential bugs, edge cases, and logical flaws in the proposals. Be thorough and constructive in your critique.' },
         { id: 'brainstorm', label: 'Brainstorm ideas', value: 'You are the creative brainstormer. Generate multiple diverse approaches, alternative solutions, and novel ideas without worrying about implementation details.' },
+        { id: 'ceo', label: 'CEO (Business Strategy)', value: 'You are the CEO. You set the high-level vision, define core objectives, ensure alignment with long-term business goals, and make final decisions on strategic direction. You focus on market impact and overall value.' },
+        { id: 'coo', label: 'COO (Operational Focus)', value: 'You are the COO. You focus on operational efficiency, execution, processes, scalability, and day-to-day management. You identify practical hurdles and streamline workflows to achieve the goals.' },
+        { id: 'cfo', label: 'CFO (Financial/Resource)', value: 'You are the CFO. You manage financial health, resource allocation, cost efficiency, and risk assessment. You ensure projects are fiscally responsible, sustainable, and provide clear ROI.' },
+        { id: 'cto', label: 'CTO (Technology/Stack)', value: 'You are the CTO. You define the technical architecture, choose the tech stack, ensure code quality, evaluate technical debt, and ensure the chosen technology supports the business objectives.' },
         { id: 'summarize', label: 'Summarize key points', value: 'You are the summarizer. Distill the discussion into clear, concise summaries of key decisions, action items, and critical insights.' },
         { id: 'factcheck', label: 'Fact checker', value: 'You are the fact checker. Verify claims, check for accuracy, and ensure all statements are grounded in reality and technical feasibility.' },
         { id: 'experiment', label: 'Experiment with approaches', value: 'You are the experimenter. Try different approaches, explore edge cases, and test assumptions with practical examples.' },
@@ -1327,6 +1383,7 @@ try {
       const S = {
         cfg: {
           freellmUrl: 'http://127.0.0.1:31415',
+          cloudProvider: 'gateway',
           key: '',
           directKey: '',
           slots: [],
@@ -1468,25 +1525,25 @@ try {
               const data = await r.json().catch(() => ({}));
               if (!data.upstream) {
                 $('dot').className = 'dot bad';
-                $('status').textContent = 'FreeLLMAPI offline (proxy listening)';
+                $('status').textContent = 'Gateway offline (proxy listening)';
                 S.backendStatus = 'disconnected';
                 return;
               }
             }
             $('dot').className = 'dot ok';
-            $('status').textContent = 'FreeLLMAPI connected (' + (base || 'proxy') + ')';
+            $('status').textContent = 'connected (' + (base || 'proxy') + ')';
             S.backendStatus = 'upstream';
             console.log('[checkHealth] Success - backend connected');
             return;
           }
           $('dot').className = 'dot bad';
-          $('status').textContent = 'FreeLLMAPI not answering at ' + (base || 'proxy');
+          $('status').textContent = 'No response from ' + (base || 'gateway');
           S.backendStatus = 'disconnected';
         } catch (err) {
           const base = S.cfg.freellmUrl || 'http://127.0.0.1:31415';
           $('dot').className = 'dot bad';
           const errMsg = err && err.message ? ' (' + err.message.slice(0, 35) + ')' : '';
-          $('status').textContent = 'FreeLLMAPI offline at ' + base + errMsg;
+          $('status').textContent = 'Gateway offline at ' + base + errMsg;
           S.backendStatus = 'disconnected';
         }
       }
@@ -1638,29 +1695,56 @@ try {
         return out;
       }
 
-      // ---------- calling the model (FreeLLMAPI, Local, or Direct) ----------
+      // ---------- calling the model (Local, Cloud, or Gateway) ----------
       async function streamChat(model, messages, onDelta, signal) {
         const body = { model, messages, stream: true };
         if (S.cfg.maxTokens > 0) body.max_tokens = S.cfg.maxTokens;
-
         // Show in Preview Pane
         const lastUser = [...messages].reverse().find(m => m.role === 'user');
         $('previewPrompt').textContent = lastUser ? lastUser.content : JSON.stringify(messages, null, 2);
         $('previewStream').textContent = '';
 
         const headers = { 'Content-Type': 'application/json' };
-        const authKey = S.cfg.directKey || S.cfg.key;
-        if (authKey) headers.Authorization = 'Bearer ' + authKey;
-
         let r;
-        if (model.includes(':') || model.startsWith('ollama/')) {
+
+        // ---- Local: Ollama (port 11434) ----
+        if (model.startsWith('ollama/')) {
           const clean = model.replace(/^ollama\//, '');
           r = await fetch('http://127.0.0.1:11434/v1/chat/completions', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: clean, messages, stream: true }), signal
+            body: JSON.stringify({ model: clean, messages, stream: true }), signal,
           });
+        // ---- Local: LM Studio (port 1234) ----
+        } else if (model.startsWith('lmstudio/')) {
+          const clean = model.replace(/^lmstudio\//, '');
+          r = await fetch('http://127.0.0.1:1234/v1/chat/completions', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: clean, messages, stream: true }), signal,
+          });
+        // ---- Anthropic (Claude) ----
+        } else if (model.startsWith('claude-')) {
+          const authKey = S.cfg.directKey || '';
+          if (authKey) headers.Authorization = 'Bearer ' + authKey;
+          headers['anthropic-version'] = '2023-06-01';
+          headers['x-title'] = 'Roundtable';
+          r = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST', headers,
+            body: JSON.stringify({ model, messages, stream: true, max_tokens: S.cfg.maxTokens || 4096 }),
+            signal,
+          });
+        // ---- Cloud provider or gateway ----
         } else {
-          const base = await getApiBase();
+          const provider = S.cfg.cloudProvider || 'gateway';
+          const pdef = (typeof PROVIDERS !== 'undefined' && PROVIDERS[provider]) ? PROVIDERS[provider] : null;
+          const authKey = S.cfg.directKey || S.cfg.key || '';
+          if (authKey) headers.Authorization = 'Bearer ' + authKey;
+          let base;
+          if (provider === 'gateway' || !pdef || !pdef.base) {
+            base = await getApiBase();
+            if (base === null || base === undefined) base = '';
+          } else {
+            base = pdef.base;
+          }
           const url = (base ? base : '') + '/v1/chat/completions';
           r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal });
         }
@@ -1670,24 +1754,20 @@ try {
           try { const j = await r.json(); msg = (j.error && (j.error.message || j.error)) || j.message || msg; } catch { }
           throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
         }
-
         const ct = r.headers.get('content-type') || '';
         if (!ct.includes('text/event-stream')) {
           const j = await r.json();
-          const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-          if (t) {
-            onDelta(t);
-            $('previewStream').textContent = t;
-          }
+          // Anthropic messages API shape
+          const t = (j.content && j.content[0] && j.content[0].text)
+            || (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content);
+          if (t) { onDelta(t); $('previewStream').textContent = t; }
           return;
         }
-
         const reader = r.body.getReader();
         const dec = new TextDecoder();
         let buf = '';
         let accumulated = '';
-
-        for (; ;) {
+        for (;;) {
           const { value, done } = await reader.read();
           if (done) break;
           buf += dec.decode(value, { stream: true });
@@ -1701,7 +1781,10 @@ try {
             try {
               const j = JSON.parse(data);
               if (j.error) throw new Error(j.error.message || JSON.stringify(j.error));
-              const d = j.choices && j.choices[0] && j.choices[0].delta;
+              // Anthropic streaming shape
+              const d = (j.type === 'content_block_delta' && j.delta && j.delta.text)
+                ? { content: j.delta.text }
+                : (j.choices && j.choices[0] && j.choices[0].delta);
               if (d && d.content) {
                 accumulated += d.content;
                 onDelta(d.content);
@@ -1985,7 +2068,7 @@ try {
         const list = S.models.filter(m => !q || m.toLowerCase().includes(q)).slice(0, 120);
         $('modellist').innerHTML = S.models.length
           ? (list.map(m => `<div class="modelitem"><span>${esc(m)}</span><button class="btn" data-add="${esc(m)}">Add</button></div>`).join('') || '<div class="modelitem"><span class="note">No matches.</span></div>')
-          : '<div class="modelitem"><span class="note">Click "Load FreeLLMAPI Models" first.</span></div>';
+          : '<div class="modelitem"><span class="note">Select a provider and click "Load Models".</span></div>';
       }
 
       function addSlot(model) {
@@ -2016,7 +2099,8 @@ try {
           if (r.ok) {
             const j = await r.json();
             for (const m of (j.data || [])) {
-              found.push({ id: m.id, name: m.id, source: 'LM-Studio' });
+              // Prefix with lmstudio/ so streamChat routes to port 1234
+              found.push({ id: 'lmstudio/' + m.id, name: m.id, source: 'LM-Studio' });
             }
           }
         } catch { }
@@ -2040,15 +2124,130 @@ try {
         }
       }
 
+      // ---------- provider config ----------
+      const PROVIDERS = {
+        openrouter: {
+          label: 'OpenRouter API Key',
+          placeholder: 'sk-or-v1-...',
+          base: 'https://openrouter.ai/api',
+          modelsPath: '/v1/models',
+          keyLink: '<a href="https://openrouter.ai/keys" target="_blank">Get a free key \u2197</a>',
+          modelsField: data => (data.data || []).map(x => x.id),
+        },
+        groq: {
+          label: 'Groq API Key',
+          placeholder: 'gsk_...',
+          base: 'https://api.groq.com/openai',
+          modelsPath: '/v1/models',
+          keyLink: '<a href="https://console.groq.com/keys" target="_blank">Get a free key \u2197</a>',
+          modelsField: data => (data.data || []).map(x => x.id),
+        },
+        gemini: {
+          label: 'Google AI Studio API Key',
+          placeholder: 'AIza...',
+          base: 'https://generativelanguage.googleapis.com/v1beta/openai',
+          modelsPath: '/models',
+          keyLink: '<a href="https://aistudio.google.com/app/apikey" target="_blank">Get a free key \u2197</a>',
+          modelsField: data => (data.models || data.data || []).map(x => x.name || x.id).filter(x => x && x.includes('gemini')),
+        },
+        openai: {
+          label: 'OpenAI API Key',
+          placeholder: 'sk-...',
+          base: 'https://api.openai.com',
+          modelsPath: '/v1/models',
+          keyLink: '<a href="https://platform.openai.com/api-keys" target="_blank">Get a key \u2197</a>',
+          modelsField: data => (data.data || []).map(x => x.id).filter(x => x.startsWith('gpt') || x.startsWith('o1') || x.startsWith('o3') || x.startsWith('chatgpt')),
+        },
+        anthropic: {
+          label: 'Anthropic API Key',
+          placeholder: 'sk-ant-...',
+          base: null,
+          modelsPath: null,
+          keyLink: '<a href="https://console.anthropic.com/settings/keys" target="_blank">Get a key \u2197</a>',
+          modelsField: null,
+          staticModels: [
+            'claude-opus-4-5', 'claude-sonnet-4-5', 'claude-haiku-4-5',
+            'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022',
+            'claude-3-opus-20240229',
+          ],
+        },
+        gateway: {
+          label: 'Gateway Key (optional)',
+          placeholder: 'freellmapi-... or leave empty',
+          base: null,
+          modelsPath: '/v1/models',
+          keyLink: '',
+          modelsField: data => (data.data || []).map(x => x.id).filter(Boolean),
+        },
+      };
+
+      function updateCloudProviderUI() {
+        const sel = $('cloudProvider');
+        const provider = sel ? sel.value : (S.cfg.cloudProvider || 'openrouter');
+        S.cfg.cloudProvider = provider;
+        save();
+        const pdef = PROVIDERS[provider] || PROVIDERS.openrouter;
+        const isGateway = provider === 'gateway';
+
+        const keyLabel = $('cloudKeyLabel');
+        const keyInput = $('directKey');
+        const keyLinks = $('cloudKeyLinks');
+        if (keyLabel) keyLabel.textContent = pdef.label;
+        if (keyInput) keyInput.placeholder = pdef.placeholder;
+        if (keyLinks) keyLinks.innerHTML = pdef.keyLink || '';
+
+        const gwUrlF = $('gatewayUrlField');
+        const gwKeyF = $('gatewayKeyField');
+        const cloudKeyF = $('cloudKeyField');
+        if (gwUrlF) gwUrlF.style.display = isGateway ? '' : 'none';
+        if (gwKeyF) gwKeyF.style.display = isGateway ? '' : 'none';
+        if (cloudKeyF) cloudKeyF.style.display = isGateway ? 'none' : '';
+
+        const hint = $('manualCloudHint');
+        if (hint) {
+          if (provider === 'anthropic') hint.textContent = 'Anthropic does not expose a model list \u2014 add model IDs manually.';
+          else if (isGateway) hint.textContent = 'Or type any model ID your gateway supports.';
+          else hint.textContent = '';
+        }
+
+        if (provider === 'anthropic' && pdef.staticModels) {
+          S.models = [...pdef.staticModels];
+          store.set('rt.models', S.models);
+          renderModelList();
+          const note = $('loadNote');
+          if (note) note.textContent = pdef.staticModels.length + ' models ready.';
+        }
+      }
+
       async function loadModels() {
         const note = $('loadNote');
-        note.textContent = 'Loading models…';
-        S.cfg.key = $('key').value.trim();
-        if ($('freellmUrl')) S.cfg.freellmUrl = $('freellmUrl').value.trim();
+        note.textContent = 'Loading\u2026';
+        const provider = S.cfg.cloudProvider || 'gateway';
+        const pdef = PROVIDERS[provider] || PROVIDERS.openrouter;
+
+        if (provider === 'gateway') {
+          S.cfg.key = $('key') ? $('key').value.trim() : '';
+          if ($('freellmUrl')) S.cfg.freellmUrl = $('freellmUrl').value.trim();
+        } else {
+          S.cfg.directKey = $('directKey') ? $('directKey').value.trim() : '';
+        }
+
+        if (provider === 'anthropic') { updateCloudProviderUI(); return; }
+
+        let base, authKey;
+        if (provider === 'gateway') {
+          base = await getApiBase();
+          authKey = S.cfg.key || '';
+        } else {
+          base = pdef.base;
+          authKey = S.cfg.directKey || '';
+        }
+
+        if (base === null || base === undefined) { note.textContent = 'No gateway URL configured.'; return; }
+
         try {
-          const base = await getApiBase();
-          const url = (base ? base : '') + '/v1/models';
-          const headers = S.cfg.key ? { Authorization: 'Bearer ' + S.cfg.key } : {};
+          const url = base + (pdef.modelsPath || '/v1/models');
+          const headers = authKey ? { Authorization: 'Bearer ' + authKey } : {};
           const r = await fetch(url, { headers });
           if (!r.ok) {
             let msg = r.status + ' ' + r.statusText;
@@ -2056,25 +2255,12 @@ try {
             throw new Error(msg);
           }
           const j = await r.json();
-          S.models = (j.data || []).map(x => x.id).filter(Boolean).sort((a, b) => a.localeCompare(b));
-          note.textContent = `${S.models.length} models loaded!`;
+          S.models = (pdef.modelsField ? pdef.modelsField(j) : (j.data || []).map(x => x.id))
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b));
+          note.textContent = S.models.length + ' models loaded!';
           store.set('rt.models', S.models);
           renderModelList();
-
-          // If current slots contain missing/placeholder models or is empty,
-          // populate with the models the user actually has configured!
-          const activeIds = S.models;
-          const isMissingRealModels = !S.cfg.slots.length || S.cfg.slots.every(s => !activeIds.includes(s.model) && !s.model.startsWith('ollama/'));
-          if (isMissingRealModels && activeIds.length > 0) {
-            S.cfg.slots = activeIds.slice(0, Math.min(3, activeIds.length)).map(m => ({
-              id: nid(),
-              model: m,
-              name: shortName(m),
-              role: ''
-            }));
-            renderSlots();
-            renderLineup();
-          }
           save();
         } catch (e) {
           note.textContent = 'Failed: ' + e.message;
@@ -2086,7 +2272,7 @@ try {
         if (!S.cfg.slots.length) { note.textContent = 'No models in lineup to validate.'; return; }
         note.textContent = 'Validating lineup…';
         const base = await getApiBase();
-        if (base === undefined || base === null) { note.textContent = 'FreeLLMAPI base not reachable.'; return; }
+        if (base === undefined || base === null) { note.textContent = 'No gateway reachable.'; return; }
         const headers = { 'Content-Type':'application/json' };
         if (S.cfg.key) headers.Authorization = 'Bearer ' + S.cfg.key;
         const results = [];
@@ -2136,7 +2322,7 @@ try {
       function quickStart() {
         const all = [...S.models, ...S.localModels.map(m => m.id)];
         if (!all.length) {
-          alert('Please click "Load FreeLLMAPI Models" or "Detect Local Models" first so Roundtable knows which models are active on your system.');
+          alert('Please click "Load Models" in the Cloud tab or "Detect Local Models" in the Local tab first.');
           return;
         }
         const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -2146,11 +2332,11 @@ try {
           const hit = all.find(m => opts.some(o => norm(m).includes(o)));
           if (hit && !next.includes(hit)) next.push(hit);
         }
-        if (!next.length) next.push(...all.slice(0, 3));
-        // Assign roles: slot 1 = outline/drafter, slot 2 = critique, last = synthesizer
-        const quickRoles = ['outline', 'critique', 'synthesizer'];
+        if (!next.length) next.push(...all.slice(0, 4));
+        // Assign roles: slot 1 = outline/drafter, slot 2 = critique, slot 3 = synthesizer, slot 4 = brainstorm
+        const quickRoles = ['outline', 'critique', 'synthesizer', 'brainstorm'];
         S.cfg.slots = next.map((m, i) => {
-          const roleDef = quickRoles[i] || quickRoles[quickRoles.length - 1];
+          const roleDef = quickRoles[i % quickRoles.length];
           const roleObj = ROLE_TEMPLATES.find(r => r.id === roleDef);
           return { id: nid(), model: m, name: shortName(m), role: roleObj ? roleObj.value : '' };
         });
@@ -2434,7 +2620,7 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
           $('loadNote').textContent = 'Probing ports 31415 & 3001…';
           const base = await getApiBase();
           $('freellmUrl').value = base;
-          $('loadNote').textContent = 'Detected FreeLLMAPI at ' + base;
+          $('loadNote').textContent = 'Gateway detected at ' + base;
           checkHealth();
         };
       }
@@ -2457,6 +2643,16 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       };
 
       if ($('btnLoad')) $('btnLoad').onclick = loadModels;
+      if ($('cloudProvider')) $('cloudProvider').onchange = updateCloudProviderUI;
+      if ($('btnAddManualCloud')) $('btnAddManualCloud').onclick = () => {
+        const val = $('manualCloudModel') ? $('manualCloudModel').value.trim() : '';
+        if (!val) return;
+        const provider = S.cfg.cloudProvider || 'openrouter';
+        // Tag LM Studio models so streamChat routes them correctly
+        const modelId = provider === 'gateway' && $('freellmUrl') && $('freellmUrl').value.includes('1234') ? 'lmstudio/' + val : val;
+        addSlot(modelId);
+        if ($('manualCloudModel')) $('manualCloudModel').value = '';
+      };
       if ($('btnValidate')) $('btnValidate').onclick = validateLineupModels;
       if ($('btnQuick')) $('btnQuick').onclick = quickStart;
       if ($('search')) $('search').oninput = renderModelList;
@@ -2585,8 +2781,11 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       const savedChats = store.get('rt.chats'); if (savedChats && typeof savedChats === 'object') S.chats = savedChats;
 
       if ($('freellmUrl')) $('freellmUrl').value = S.cfg.freellmUrl || 'http://127.0.0.1:31415';
-      $('key').value = S.cfg.key || '';
-      $('directKey').value = S.cfg.directKey || '';
+      if ($('key')) $('key').value = S.cfg.key || '';
+      if ($('directKey')) $('directKey').value = S.cfg.directKey || '';
+      // Restore saved provider selection and update UI accordingly
+      if ($('cloudProvider')) $('cloudProvider').value = S.cfg.cloudProvider || 'gateway';
+      updateCloudProviderUI();
       $('rounds').value = String(S.cfg.rounds || 1);
       $('outputFormat').value = S.cfg.outputFormat || 'markdown';
       $('fallback').value = S.cfg.fallback == null ? 'auto' : S.cfg.fallback;
@@ -2604,7 +2803,7 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       checkHealth(); setInterval(checkHealth, 15000);
 
       if (!S.cfg.slots.length) {
-        openSetup('Welcome! Click "Detect Local Models" or enter your FreeLLMAPI key to build your table.');
+        openSetup('Welcome! Add local models (Ollama / LM Studio) or connect a cloud provider in the Cloud Models tab.');
       }
 
         // ========== ARTIFACT SYSTEM ==========
@@ -2845,8 +3044,8 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
           'Implement exactly what the synthesized artifact describes. If it is code,',
           'create the files it specifies. If it is a plan, turn it into working software.',
           'If it is a document, produce the final file (e.g. .pdf, .md) it asks for.',
-          'Use the freellmapi/fusion model for multi-model synthesis, or',
-          'freellmapi/auto:free-coding for a coding pipeline.',
+          'Use your preferred model for multi-model synthesis, or',
+          'a fast coding model for a coding pipeline.',
           '',
           'Do not re-deliberate — the roundtable already converged. Build it.',
         ].join('\n');
@@ -2931,6 +3130,13 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       // ---------- Templates Drawer ----------
       const TEMPLATES = [
         { 
+          id: 'executive_board', 
+          name: '🏢 Executive Board', 
+          desc: 'Business strategy with CEO, COO, CFO, and CTO perspectives.',
+          preamble: 'You are an executive board collaborating on a business strategy question. Each member brings their area of expertise: the CEO sets strategic vision and alignment, the COO focuses on execution and operations, the CFO manages financial health and resource allocation, and the CTO defines technical architecture and feasibility. Work together to produce a comprehensive business strategy with clear action items and owners.',
+          roles: ['ceo', 'coo', 'cfo', 'cto']
+        },
+        { 
           id: 'skill_writer', 
           name: '📝 Skill Writer', 
           desc: 'Produce a reusable SKILL.md file for AI assistants.',
@@ -2985,10 +3191,10 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
         const tpl = TEMPLATES.find(t => t.id === btn.dataset.tpl); if (!tpl) return;
         S.cfg.preamble = tpl.preamble;
         $('preamble').value = tpl.preamble;
-        // Assign template-specific roles to each slot (slot 0 = first role, last = synthesizer)
+        // Assign template-specific roles to each slot (cycle through roles if more slots than roles)
         if (S.cfg.slots.length > 0 && tpl.roles && tpl.roles.length) {
           S.cfg.slots.forEach((slot, i) => {
-            const roleDef = tpl.roles[i] || tpl.roles[tpl.roles.length - 1];
+            const roleDef = tpl.roles[i % tpl.roles.length];
             const roleObj = ROLE_TEMPLATES.find(r => r.id === roleDef);
             if (roleObj) slot.role = roleObj.value;
           });

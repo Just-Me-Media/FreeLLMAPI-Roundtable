@@ -1,14 +1,13 @@
 #!/usr/bin/env node
 'use strict';
-// Roundtable server: serves index.html and proxies /v1/* to FreeLLMAPI.
+// Roundtable server: serves index.html and proxies /v1/* to an OpenAI-compatible gateway.
 // No dependencies.   Usage: node server.js
 //
 // Env:
 //   PORT             Port for Roundtable itself (default 5173)
-//   FREELLMAPI_URL   Where FreeLLMAPI lives. If unset, Roundtable looks for it on
-//                    http://127.0.0.1:3001 (Docker / npm run dev) and
-//                    http://127.0.0.1:31415 (desktop app) and uses whichever answers.
-//   FREELLMAPI_KEY   Optional unified key to use when the browser sends none.
+//   FREELLMAPI_URL   Optional gateway URL. If unset, Roundtable probes
+//                    http://127.0.0.1:3001 and http://127.0.0.1:31415 automatically.
+//   FREELLMAPI_KEY   Optional default key to use when the browser sends none.
 
 const http = require('http');
 const https = require('https');
@@ -54,11 +53,14 @@ const json = (res, code, obj) => {
   res.end(JSON.stringify(obj));
 };
 
-// CORS: only the desktop app's own webview origins may read responses.
+// CORS: allow same-origin and localhost for testing
 const ALLOWED_ORIGINS = new Set(['http://tauri.localhost', 'https://tauri.localhost', 'tauri://localhost']);
 function cors(req, res) {
   const o = req.headers.origin;
-  if (!o || !ALLOWED_ORIGINS.has(o)) return;
+  // Allow if no origin, Tauri origins, or localhost origins (for testing)
+  const isLocalhostOrigin = o && o.startsWith('http://localhost:');
+  const isTauriOrigin = ALLOWED_ORIGINS.has(o);
+  if (!o || (!isLocalhostOrigin && !isTauriOrigin)) return;
   res.setHeader('Access-Control-Allow-Origin', o);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -101,7 +103,7 @@ const server = http.createServer(async (req, res) => {
     up.on('error', err => {
       if (res.headersSent) return res.end();
       const where = PINNED ? PINNED.origin : 'http://127.0.0.1:3001 or :31415';
-      json(res, 502, { error: { message: `Cannot reach FreeLLMAPI at ${where} (${err.code || err.message}). Is it running?` } });
+      json(res, 502, { error: { message: `Cannot reach gateway at ${where} (${err.code || err.message}). Is it running?` } });
     });
     // If the browser aborts (Stop button), drop the upstream request too.
     res.on('close', () => { if (!res.writableEnded) up.destroy(); });
@@ -115,6 +117,6 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, async () => {
   console.log(`Roundtable running at http://localhost:${PORT}`);
   const found = await resolveTarget();
-  if (found) console.log(`Using FreeLLMAPI at ${found.origin}`);
-  else console.log(`FreeLLMAPI not found yet (${PINNED ? PINNED.origin : '3001 and 31415'}). Start it; Roundtable will pick it up automatically.`);
+  if (found) console.log(`Using gateway at ${found.origin}`);
+  else console.log(`No gateway found yet (${PINNED ? PINNED.origin : '3001 and 31415'}). Start one; Roundtable will pick it up automatically.`);
 });

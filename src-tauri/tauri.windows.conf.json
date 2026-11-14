@@ -1,15 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Roundtable",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "identifier": "media.justme.roundtable",
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyQjBGMTM3MEYxRjRDOUQKUldTZFRCOFBOL0d3MHVxOU00OVEvYkFKTXk2NGZCSERSNnBEc0tBV29DM0MyeVR1WjJZQnp6NUQK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDZFOEM5OUQ3MUQ5QjJCNUEKUldSYUs1c2QxNW1NYnVZTW0wVmRqRUNudmpSTjNhc2pVMVdTcFVMOU9pYUpiV0JUZHFXeGlzRFoK"
     }
   },
   "build": {
-    "beforeBuildCommand": "",
+    "beforeBuildCommand": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"New-Item -ItemType Directory -Force dist | Out-Null; Copy-Item index.html dist -Force; if (Test-Path dist\\src) { Remove-Item dist\\src -Recurse -Force }; Copy-Item src dist\\src -Recurse -Force\"",
     "frontendDist": "../dist"
   },
   "app": {

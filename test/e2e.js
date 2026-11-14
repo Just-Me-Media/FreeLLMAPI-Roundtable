@@ -22,11 +22,15 @@ const check = (cond, msg) => {
 
     await page.goto(stack.base);
     await page.waitForFunction(() => document.getElementById('status').textContent.includes('connected'));
-    check(true, 'health shows FreeLLMAPI connected');
+    check(true, 'health shows gateway connected');
     check(await page.locator('#overlay.open').count() === 1, 'setup opens on first run');
 
-    // Bad key surfaces the upstream error; good key loads models
+    // Bad key surfaces the upstream error; good key loads models (using gateway provider path)
     await page.click('[data-tab="tab-cloud"]');
+    // Select gateway provider so the key and URL fields are visible
+    await page.selectOption('#cloudProvider', 'gateway');
+    // Fill the gateway key field (visible after selecting gateway provider)
+    await page.locator('#gatewayKeyField #key').waitFor({ state: 'attached' });
     await page.fill('#key', 'wrong');
     await page.click('#btnLoad');
     await page.waitForFunction(() => document.getElementById('loadNote').textContent.startsWith('Failed'));
