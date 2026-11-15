@@ -32,9 +32,12 @@
 
 - Built by the **Release Windows** workflow (`.github/workflows/release.yml`,
   `windows-latest`) from tag `v0.2.4`, using the same `build-windows.ps1` the
-  ThinkCentre uses.
-- Output: `Roundtable_0.2.4_x64-setup.exe` (NSIS) and
-  `Roundtable_0.2.4_x64_en-US.msi`.
+  ThinkCentre uses. Run `43668109559`, 6m24s, completed successfully.
+- Output: `Roundtable_0.2.4_x64-setup.exe` (4,294,435 bytes) and
+  `Roundtable_0.2.4_x64_en-US.msi` (6,410,240 bytes).
+- Signature check: `windows-x86_64` in the published `updates.json` verifies
+  against the baked-in pubkey (minisign prehashed `ED`), and a tampered copy
+  of the installer is rejected.
 - Installers are **unsigned**, so SmartScreen shows "Windows protected your PC"
   until Azure Trusted Signing is enabled. Deferred on purpose: the $200 trial
   credit runs for 30 days from signup and Microsoft's business-identity
