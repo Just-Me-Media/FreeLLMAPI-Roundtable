@@ -106,6 +106,27 @@ const check = (cond, msg) => {
     await page.waitForFunction(() => !document.getElementById('btnSend').disabled, null, { timeout: 5000 });
     check(true, 'Stop ends the run and re-enables Send');
 
+    // Non-forced update offer: advertises the new version, installs nothing.
+    await page.evaluate(async () => {
+      window.__installCalled = false;
+      window.__TAURI__ = {
+        app: { getVersion: async () => '0.2.2' },
+        updater: {
+          check: async () => ({
+            version: '9.9.9',
+            downloadAndInstall: async () => { window.__installCalled = true; },
+          }),
+        },
+      };
+      await window.__RT_STARTUP_UPDATE__();
+    });
+    check((await page.textContent('#btnUpdate')).includes('Update available'),
+      'startup check advertises the new version');
+    check(await page.evaluate(() => window.__installCalled === false),
+      'startup check installs nothing on its own');
+    check(await page.textContent('.maker') === 'by Just Me Media',
+      'header credits Just Me Media');
+
     check(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.join(' / ') : ''));
   } finally {
     await browser.close();

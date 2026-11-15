@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Roundtable",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "identifier": "media.justme.roundtable",
   "plugins": {
     "updater": {
@@ -37,6 +37,9 @@
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.ico"
-    ]
+    ],
+    "copyright": "\u00a9 2026 Just Me Media",
+    "shortDescription": "Roundtable by Just Me Media",
+    "longDescription": "Roundtable runs several AI models in one shared conversation, each with a role, and synthesizes a single final answer. Made by Just Me Media."
   }
 }

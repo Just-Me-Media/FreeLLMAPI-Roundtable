@@ -110,6 +110,20 @@
       letter-spacing: .01em;
     }
 
+    .maker {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: .02em;
+      color: var(--muted);
+      white-space: nowrap;
+      padding-left: 2px;
+    }
+
+    /* Narrow windows: drop the credit rather than push the controls off-screen. */
+    @media (max-width: 899px) {
+      .maker { display: none; }
+    }
+
     .dot {
       width: 9px;
       height: 9px;
@@ -865,8 +879,9 @@
     <button class="btn" id="btnTemplates" title="Quick-load a production template">🎯 Templates</button>
     <div class="dot" id="dot"></div>
     <h1>Roundtable</h1>
+    <span class="maker" title="Made by Just Me Media">by Just Me Media</span>
     <span id="status">checking…</span>
-    <span id="buildStamp" style="font-size:0.65rem;opacity:0.4;margin-left:4px" title="Build timestamp">v2026-11-05T2030</span>
+    <span id="buildStamp" style="font-size:0.65rem;opacity:0.4;margin-left:4px" title="App version"></span>
     <span class="spacer"></span>
     <button class="btn" id="btnTogglePreview" title="Toggle response preview pane">👁️ Preview</button>
     <button class="btn" id="btnSetup">⚙️ Setup</button>
@@ -3382,7 +3397,84 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       if ($('btnCloseBatch')) $('btnCloseBatch').onclick = closeBatchDrawer;
       if ($('btnRunBatch')) $('btnRunBatch').onclick = runBatch;
       if ($('batchOverlay')) $('batchOverlay').addEventListener('mousedown', e => { if (e.target.id === 'batchOverlay') closeBatchDrawer(); });
-    
+
+      // ---------- Non-forced update check ----------
+      // Runs once shortly after launch. It only ever *offers* an update:
+      // nothing is downloaded or installed unless the user picks Install.
+      async function startupUpdateCheck() {
+        const T = window.__TAURI__;
+        const U = T && T.updater;
+        if (!U) return; // web build — no updater to talk to
+
+        let current = 'an older version';
+        if (T.app && T.app.getVersion) {
+          try { current = 'v' + (await T.app.getVersion()); } catch { }
+        }
+
+        let update;
+        try {
+          update = await U.check();
+        } catch (e) {
+          // Offline, no release yet, transient GitHub hiccup — never nag at startup.
+          console.warn('Update check skipped:', e && e.message ? e.message : e);
+          return;
+        }
+        if (!update) return;
+
+        // Keep the offer visible even if the prompt is dismissed.
+        const btn = $('btnUpdate');
+        if (btn) {
+          btn.textContent = '🔄 Update available';
+          btn.title = `Version ${update.version} is available`;
+        }
+
+        // Prompt once per version. Declining stops the automatic prompt for
+        // this version, but the header button still installs on demand.
+        if (store.get('rt.updateSkipped') === update.version) return;
+
+        // Don't interrupt the setup screen or a drawer.
+        for (let i = 0; i < 40 && $('overlay') && $('overlay').classList.contains('open'); i++) {
+          await new Promise(r => setTimeout(r, 3000));
+        }
+
+        const go = await modalConfirm(
+          `Roundtable ${update.version} is available.\n\n` +
+          `You're on ${current}. Install it now?\n\n` +
+          `Nothing is downloaded or changed unless you choose Install.`,
+          'Update available'
+        );
+        if (!go) { store.set('rt.updateSkipped', update.version); return; }
+
+        try {
+          await update.downloadAndInstall(ev => {
+            const s = ev || {};
+            if (s.event === 'Started') $('status').textContent = 'Downloading update…';
+            else if (s.event === 'Progress') $('status').textContent = `Downloaded ${((s.chunk_length || 0) / 1024 / 1024).toFixed(1)} MB`;
+            else if (s.event === 'Finished') $('status').textContent = 'Download complete, installing…';
+          });
+          await modalAlert('Update installed. Restart Roundtable to use it.', 'Restart required');
+        } catch (e) {
+          await modalAlert('Update failed: ' + (e && e.message ? e.message : String(e)), 'Update error');
+        }
+      }
+
+      // Exposed so the end-to-end suite can exercise the offer without
+      // waiting for the 5s launch timer.
+      window.__RT_STARTUP_UPDATE__ = startupUpdateCheck;
+
+      // Show the real app version instead of a stale hand-written stamp.
+      if ($('buildStamp')) {
+        const T = window.__TAURI__;
+        if (T && T.app && T.app.getVersion) {
+          T.app.getVersion().then(v => { $('buildStamp').textContent = 'v' + v; }).catch(() => { });
+        } else {
+          $('buildStamp').style.display = 'none';
+        }
+      }
+
+      // Give the UI a moment to settle before the first network call.
+      setTimeout(startupUpdateCheck, 5000);
+
         })();
   </script>
 
