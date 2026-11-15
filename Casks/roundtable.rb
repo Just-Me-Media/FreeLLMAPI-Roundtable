@@ -2,8 +2,7 @@ cask "roundtable" do
   version "0.2.4"
   sha256 "4626cadc0d46d6edfbe37437200674cac8f118a25d108c11271ebf3fe7183980"
 
-  url "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v#{version}/Roundtable_#{version}_universal.dmg",
-      verified: "github.com/Just-Me-Media/FreeLLMAPI-Roundtable/"
+  url "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v#{version}/Roundtable_#{version}_universal.dmg"
   name "Roundtable"
   desc "Run several AI models in one shared, role-based conversation"
   homepage "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable"
@@ -13,7 +12,7 @@ cask "roundtable" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :monterey"
+  depends_on macos: :monterey
 
   app "Roundtable.app"
 

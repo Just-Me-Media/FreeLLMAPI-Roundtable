@@ -73,6 +73,9 @@
   ```bash
   brew install --cask just-me-media/tap/roundtable
   ```
+  On Homebrew 5+ a third-party tap must be trusted once:
+  `brew trust just-me-media/tap`. Verified end-to-end on 2026-11-15
+  (install from the tap, checksum match, `spctl` Notarized Developer ID).
 - **winget:** not yet — it requires a signed installer, so it follows Azure
   Trusted Signing.
 
@@ -102,7 +105,12 @@
    ```
    Expect `200`, and both `darwin-aarch64`, `darwin-x86_64` and
    `windows-x86_64` under `platforms`.
-8. Copy the updated cask into the tap repo and push it.
+8. Copy the updated cask into the tap repo and push it:
+   ```bash
+   cp Casks/roundtable.rb /path/to/homebrew-tap/Casks/roundtable.rb
+   git -C /path/to/homebrew-tap commit -am "roundtable: <version>"
+   git -C /path/to/homebrew-tap push
+   ```
 
 ## macOS build checklist
 

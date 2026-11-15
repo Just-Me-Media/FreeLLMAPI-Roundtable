@@ -27,8 +27,7 @@ cask "roundtable" do
   version "${VERSION}"
   sha256 "${SHA}"
 
-  url "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v#{version}/Roundtable_#{version}_universal.dmg",
-      verified: "github.com/Just-Me-Media/FreeLLMAPI-Roundtable/"
+  url "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v#{version}/Roundtable_#{version}_universal.dmg"
   name "Roundtable"
   desc "Run several AI models in one shared, role-based conversation"
   homepage "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable"
@@ -38,7 +37,7 @@ cask "roundtable" do
     strategy :github_latest
   end
 
-  depends_on macos: ">= :monterey"
+  depends_on macos: :monterey
 
   app "Roundtable.app"
 

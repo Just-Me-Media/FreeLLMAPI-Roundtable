@@ -39,6 +39,8 @@ Or install with Homebrew:
 brew install --cask just-me-media/tap/roundtable
 ```
 
+Newer Homebrew versions ask you to trust third-party taps first. If it refuses or prompts, run `brew trust just-me-media/tap` once.
+
 ### Windows
 [Roundtable_0.2.4_x64-setup.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_x64-setup.exe) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_x64_en-US.msi) — requires Windows 10/11 64-bit
 
