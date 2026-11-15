@@ -23,6 +23,7 @@ Works for writing, research, decisions, code review, marketing copy, study guide
 - **Live artifact panel** — the Synthesizer's output renders in a side panel (Markdown, HTML, or code) with version history and line-diff
 - **12 ready-made templates** — Essay, Blog Post, Decision Analysis, Code Review, Marketing Copy, Product Brief, and more — each pre-loads the right roles and instructions
 - **All major providers** — OpenRouter, Groq, Google Gemini, OpenAI, Anthropic, or any OpenAI-compatible gateway (Ollama, LM Studio, FreeLLMAPI, LiteLLM)
+- **Attachments and dictation** — drop images and text files onto the window (or use 📎 Attach), then speak your prompt with 🎤 Speak
 - **Batch mode** — run multiple prompts through the full lineup and collect synthesized artifacts as a downloadable file
 - **Privacy-first** — keys stored in-browser only, local proxy binds to 127.0.0.1, zero telemetry
 
@@ -31,7 +32,7 @@ Works for writing, research, decisions, code review, marketing copy, study guide
 ## Download
 
 ### macOS — Apple Silicon and Intel
-[Roundtable_0.2.4_universal.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_universal.dmg) — requires macOS 12+, one universal build for both architectures, signed and notarized.
+[Roundtable_0.2.5_universal.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.5/Roundtable_0.2.5_universal.dmg) — requires macOS 12+, one universal build for both architectures, signed and notarized.
 
 Or install with Homebrew:
 
@@ -42,7 +43,7 @@ brew install --cask just-me-media/tap/roundtable
 Newer Homebrew versions ask you to trust third-party taps first. If it refuses or prompts, run `brew trust just-me-media/tap` once.
 
 ### Windows
-[Roundtable_0.2.4_x64-setup.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_x64-setup.exe) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_x64_en-US.msi) — requires Windows 10/11 64-bit
+[Roundtable_0.2.5_x64-setup.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.5/Roundtable_0.2.5_x64-setup.exe) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.5/Roundtable_0.2.5_x64_en-US.msi) — requires Windows 10/11 64-bit
 
 Windows installers are unsigned, so SmartScreen may show "Windows protected your PC" — choose **More info → Run anyway**.
 
@@ -67,6 +68,12 @@ Open <http://localhost:5173>. The Setup drawer opens automatically on first run.
 1. **Add models** — go to the Cloud Models tab, pick a provider (OpenRouter is free), enter your key, and click Load Models. Or use the Local Models tab to detect Ollama or LM Studio.
 2. **Apply a template** — click **🎯 Templates** in the header and choose one. It assigns roles to your models and sets focused instructions.
 3. **Send a prompt** — type your question and press Enter. Models answer in order. The Synthesizer's output appears in the right panel.
+
+### Composer tips
+
+- **Attach** — click 📎 Attach, paste from the clipboard, or drag files onto the window. Images go to vision-capable models as image parts; text and code files (up to 256 KB each) are inlined into the prompt so every model can read them. Other file types are rejected with a message.
+- **Dictate** — click 🎤 Speak and talk. macOS uses the built-in speech service; Windows and browsers record a clip and transcribe it through your provider's Whisper-compatible endpoint when one is configured (Setup → Turn Rules → Speech-to-text model).
+- **Keys** — Enter sends, Shift+Enter adds a newline, and ↑ recalls your previous prompt (with its attachments) when the box is empty.
 
 ---
 

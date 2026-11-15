@@ -1,6 +1,6 @@
 cask "roundtable" do
-  version "0.2.4"
-  sha256 "4626cadc0d46d6edfbe37437200674cac8f118a25d108c11271ebf3fe7183980"
+  version "0.2.5"
+  sha256 "fe28aad05d108ce742da699aa95c0a27a85ba049ac1a131fee93f1ef4ed61d00"
 
   url "https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v#{version}/Roundtable_#{version}_universal.dmg"
   name "Roundtable"

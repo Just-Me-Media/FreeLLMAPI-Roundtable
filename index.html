@@ -547,14 +547,15 @@
       font-size: 12px;
     }
 
-    /* Attached image chip in composer */
+    /* Attachment chips in composer (images + files) */
     .attached-images {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
     }
 
-    .img-chip {
+    .img-chip,
+    .file-chip {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -572,7 +573,8 @@
       border-radius: 4px;
     }
 
-    .img-chip .rm-img {
+    .img-chip .rm-img,
+    .file-chip .rm-file {
       border: none;
       background: none;
       color: var(--danger);
@@ -580,9 +582,35 @@
       padding: 0 2px;
     }
 
+    .file-chip .fname {
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-chip .fsize {
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .msg-files {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin: 2px 0 6px;
+    }
+
+    /* Microphone button while recording */
+    .btn.rec {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
+    }
+
     /* Drag and drop overlay */
     body.drag-active::after {
-      content: "📁 Drop image anywhere to attach to the table";
+      content: "📁 Drop images or text files anywhere to attach them";
       position: fixed;
       inset: 0;
       background: rgba(31, 95, 74, 0.88);
@@ -957,10 +985,13 @@
         <button class="btn" id="btnAgain" title="Run another round with no new message">Another round</button>
         <button class="btn danger" id="btnStop" disabled>Stop</button>
         <button class="btn" id="btnBatch" title="Run multiple prompts through the lineup and collect artifacts">⚡ Batch</button>
-        <label class="btn" title="Attach an image for vision models">
-          🖼️ Image
-          <input type="file" id="imgUpload" accept="image/*" style="display:none">
+        <label class="btn" title="Attach images or text files (or drop them on the window)">
+          📎 Attach
+          <input type="file" id="fileUpload" multiple
+            accept="image/*,text/*,.md,.markdown,.json,.jsonl,.csv,.tsv,.log,.yml,.yaml,.toml,.ini,.cfg,.conf,.xml,.html,.css,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.kt,.swift,.c,.h,.cpp,.hpp,.cs,.php,.sh,.zsh,.bat,.ps1,.sql,.tex"
+            style="display:none">
         </label>
+        <button class="btn" id="btnMic" title="Dictate with your microphone">🎤 Speak</button>
         <span class="spacer"></span>
         <span id="consensusGauge" style="font-size:12px;color:var(--muted)"></span>
         <span class="hint" id="roundHint"></span>
@@ -1105,6 +1136,11 @@
         <div class="field">
           <label for="maxTokens">Max reply tokens (0 = default)</label>
           <input type="number" id="maxTokens" min="0" step="100">
+        </div>
+        <div class="field">
+          <label for="sttModel">Speech-to-text model (microphone)</label>
+          <input type="text" id="sttModel" placeholder="whisper-1">
+          <span class="hint">Used when the browser cannot dictate directly. Leave empty for the provider default (Groq: whisper-large-v3-turbo).</span>
         </div>
       </div>
 
@@ -1400,6 +1436,7 @@ try {
           maxTokens: 0,
           outputFormat: 'markdown',
           previewOpen: true,
+          sttModel: '',
         },
         msgs: [],
         models: [],
@@ -1407,6 +1444,7 @@ try {
         chats: {}, // id -> { id, title, msgs, time }
         activeChatId: null,
         pendingImages: [],
+        pendingFiles: [],
         running: false,
         abort: null,
         backendStatus: 'checking',
@@ -1576,6 +1614,11 @@ try {
           const imgHtml = m.images && m.images.length
             ? m.images.map(src => `<img src="${src}" class="msg-img" alt="Attached">`).join('')
             : '';
+          const filesHtml = m.files && m.files.length
+            ? '<div class="msg-files">' + m.files.map(f =>
+              `<span class="file-chip" title="${esc(f.name)}">📄 <span class="fname">${esc(f.name)}</span><span class="fsize">${fmtBytes(f.size)}</span></span>`
+            ).join('') + '</div>'
+            : '';
           return `<div class="msg user" data-id="${m.id}">
         <div class="card">
           <div class="meta">
@@ -1587,6 +1630,7 @@ try {
             </div>
           </div>
           ${imgHtml}
+          ${filesHtml}
           <div class="body">${esc(m.text)}</div>
         </div>
         <div class="avatar">Y</div>
@@ -1677,6 +1721,66 @@ try {
       }
 
       // ---------- message formatting ----------
+      // A user turn can carry images (vision models) and text files. Text-only
+      // turns stay plain strings so every provider keeps receiving the shape it
+      // received before.
+      function userContentParts(m) {
+        const parts = [];
+        let text = m.text || '';
+        if (m.files && m.files.length) {
+          const blocks = m.files.map(f => {
+            const ext = (f.name.split('.').pop() || '').toLowerCase();
+            const fence = /^[a-z0-9]+$/.test(ext) ? '```' + ext : '```';
+            return `[Attached file: ${f.name}]\n\n${fence}\n${f.text}\n\`\`\``;
+          });
+          text = [text, ...blocks].filter(t => t && t.trim()).join('\n\n');
+        }
+        if (text.trim()) parts.push({ type: 'text', text });
+        for (const src of (m.images || [])) {
+          parts.push({ type: 'image_url', image_url: { url: src } });
+        }
+        return parts;
+      }
+
+      function mergeContent(a, b) {
+        const toParts = c => typeof c === 'string' ? (c ? [{ type: 'text', text: c }] : []) : c;
+        const parts = [...toParts(a), ...toParts(b)];
+        // Collapse back to a string when there is nothing but text.
+        if (parts.every(p => p.type === 'text')) return parts.map(p => p.text).join('\n\n');
+        return parts;
+      }
+
+      function contentToText(c) {
+        if (typeof c === 'string') return c;
+        if (!Array.isArray(c)) return '';
+        const text = c.filter(p => p.type === 'text').map(p => p.text).join('\n\n');
+        const imgs = c.filter(p => p.type === 'image_url').length;
+        return [text, imgs ? `[${imgs} image${imgs > 1 ? 's' : ''} attached]` : ''].filter(Boolean).join('\n\n');
+      }
+
+      // Anthropic takes the system prompt as its own field and images as
+      // base64 source blocks, not OpenAI's image_url parts.
+      function toAnthropicMessages(messages) {
+        const system = messages.filter(m => m.role === 'system')
+          .map(m => contentToText(m.content)).filter(Boolean).join('\n\n');
+        const out = messages.filter(m => m.role !== 'system').map(m => {
+          let parts;
+          if (typeof m.content === 'string') {
+            parts = [{ type: 'text', text: m.content }];
+          } else {
+            parts = m.content.map(p => {
+              if (p.type === 'text') return { type: 'text', text: p.text };
+              const match = p.type === 'image_url' &&
+                p.image_url.url.match(/^data:(image\/[a-z0-9.+-]+);base64,(.+)$/i);
+              return match ? { type: 'image', source: { type: 'base64', media_type: match[1], data: match[2] } } : null;
+            }).filter(Boolean);
+          }
+          if (!parts.length) parts = [{ type: 'text', text: '(no content)' }];
+          return { role: m.role, content: parts };
+        });
+        return { system, messages: out };
+      }
+
       function buildMessages(slot) {
         const sys = [
           S.cfg.preamble.trim(),
@@ -1687,15 +1791,20 @@ try {
         const out = [{ role: 'system', content: sys }];
         const push = (role, content) => {
           const last = out[out.length - 1];
-          if (last.role === role && role !== 'system') last.content += '\n\n' + content;
+          if (last.role === role && role !== 'system') last.content = mergeContent(last.content, content);
           else out.push({ role, content });
         };
 
         for (const m of S.msgs) {
           if (m.error || (m.pending && !m.text)) continue;
-          if (!m.text || !m.text.trim()) continue;
-          if (m.role === 'user') push('user', m.text);
-          else if (m.slot === slot.id) push('assistant', m.text);
+          const attachments = m.role === 'user'
+            ? (m.images && m.images.length) || (m.files && m.files.length)
+            : false;
+          if ((!m.text || !m.text.trim()) && !attachments) continue;
+          if (m.role === 'user') {
+            const parts = userContentParts(m);
+            push('user', parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts);
+          } else if (m.slot === slot.id) push('assistant', m.text);
           else push('user', `[${m.name}]: ${m.text}`);
         }
         if (out[out.length - 1].role !== 'user') push('user', '(Your turn. Continue the discussion.)');
@@ -1708,7 +1817,7 @@ try {
         if (S.cfg.maxTokens > 0) body.max_tokens = S.cfg.maxTokens;
         // Show in Preview Pane
         const lastUser = [...messages].reverse().find(m => m.role === 'user');
-        $('previewPrompt').textContent = lastUser ? lastUser.content : JSON.stringify(messages, null, 2);
+        $('previewPrompt').textContent = lastUser ? contentToText(lastUser.content) : JSON.stringify(messages, null, 2);
         $('previewStream').textContent = '';
 
         const headers = { 'Content-Type': 'application/json' };
@@ -1731,12 +1840,22 @@ try {
         // ---- Anthropic (Claude) ----
         } else if (model.startsWith('claude-')) {
           const authKey = S.cfg.directKey || '';
-          if (authKey) headers.Authorization = 'Bearer ' + authKey;
+          if (authKey) headers['x-api-key'] = authKey;
+          // The desktop webview is a browser origin; Anthropic requires this
+          // opt-in header for direct browser-to-API calls.
+          headers['anthropic-dangerous-direct-browser-access'] = 'true';
           headers['anthropic-version'] = '2023-06-01';
           headers['x-title'] = 'Roundtable';
+          const conv = toAnthropicMessages(messages);
           r = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST', headers,
-            body: JSON.stringify({ model, messages, stream: true, max_tokens: S.cfg.maxTokens || 4096 }),
+            body: JSON.stringify({
+              model,
+              system: conv.system || undefined,
+              messages: conv.messages,
+              stream: true,
+              max_tokens: S.cfg.maxTokens || 4096
+            }),
             signal,
           });
         // ---- Cloud provider or gateway ----
@@ -1870,18 +1989,20 @@ try {
       function send() {
         if (S.running) return;
         const text = $('input').value.trim();
-        if (!text && !S.pendingImages.length) return;
+        if (!text && !S.pendingImages.length && !S.pendingFiles.length) return;
 
         S.msgs.push({
           id: nid(),
           role: 'user',
           text,
-          images: [...S.pendingImages]
+          images: [...S.pendingImages],
+          files: S.pendingFiles.map(f => ({ ...f }))
         });
 
         $('input').value = '';
         S.pendingImages = [];
-        renderAttachedImages();
+        S.pendingFiles = [];
+        renderAttachments();
         renderChat(); scrollDown(true); save();
         runRounds(S.cfg.slots, S.cfg.rounds);
       }
@@ -1924,10 +2045,9 @@ try {
         const m = S.msgs.find(x => x.id === id);
         if (!m) return;
         $('input').value = m.text || '';
-        if (m.images && m.images.length) {
-          S.pendingImages = [...m.images];
-          renderAttachedImages();
-        }
+        S.pendingImages = m.images ? [...m.images] : [];
+        S.pendingFiles = m.files ? m.files.map(f => ({ ...f })) : [];
+        renderAttachments();
         $('input').focus();
         $('input').scrollIntoView({ behavior: 'smooth' });
       }
@@ -1942,53 +2062,110 @@ try {
         runRounds(S.cfg.slots, S.cfg.rounds);
       }
 
-      // ---------- image attachment & paste ----------
-      function renderAttachedImages() {
+      // ---------- attachments: images and text files ----------
+      const IMAGE_MAX_BYTES = 8 * 1024 * 1024;   // per image
+      const FILE_MAX_BYTES = 256 * 1024;         // per text file
+      const MAX_IMAGES = 8;
+
+      const TEXT_EXTENSIONS = new Set(('md markdown txt text json jsonl csv tsv log yml yaml '
+        + 'toml ini cfg conf xml html htm css js mjs cjs ts tsx jsx py rb go rs java kt swift '
+        + 'c h cpp hpp cc cs php sh bash zsh bat ps1 sql tex').split(' '));
+
+      const fmtBytes = n => n < 1024 ? n + ' B'
+        : n < 1024 * 1024 ? (n / 1024).toFixed(1) + ' KB'
+        : (n / 1024 / 1024).toFixed(1) + ' MB';
+
+      function isTextFile(file) {
+        if (file.type && file.type.startsWith('text/')) return true;
+        if (['application/json', 'application/jsonl', 'application/xml', 'application/javascript', 'application/x-yaml', 'application/x-sh']
+          .includes(file.type)) return true;
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        return TEXT_EXTENSIONS.has(ext);
+      }
+
+      function renderAttachments() {
         const box = $('attachedImages');
-        box.innerHTML = S.pendingImages.map((src, i) => `
+        if (!box) return;
+        const imgs = S.pendingImages.map((src, i) => `
       <span class="img-chip">
-        <img src="${src}" alt="Attached">
+        <img src="${src}" alt="Attached image ${i + 1}">
         <span>Image ${i + 1}</span>
-        <button class="rm-img" data-idx="${i}">✕</button>
-      </span>
-    `).join('');
+        <button class="rm-img" data-idx="${i}" title="Remove">✕</button>
+      </span>`).join('');
+        const files = S.pendingFiles.map((f, i) => `
+      <span class="file-chip" title="${esc(f.name)}">
+        <span aria-hidden="true">📄</span>
+        <span class="fname">${esc(f.name)}</span>
+        <span class="fsize">${fmtBytes(f.size)}</span>
+        <button class="rm-file" data-idx="${i}" title="Remove">✕</button>
+      </span>`).join('');
+        box.innerHTML = imgs + files;
       }
 
       if ($('attachedImages')) $('attachedImages').onclick = e => {
-        const btn = e.target.closest('.rm-img');
-        if (!btn) return;
-        S.pendingImages.splice(Number(btn.dataset.idx), 1);
-        renderAttachedImages();
+        const img = e.target.closest('.rm-img');
+        if (img) { S.pendingImages.splice(Number(img.dataset.idx), 1); renderAttachments(); return; }
+        const file = e.target.closest('.rm-file');
+        if (file) { S.pendingFiles.splice(Number(file.dataset.idx), 1); renderAttachments(); }
       };
 
-      if ($('imgUpload')) $('imgUpload').onchange = e => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => {
-          S.pendingImages.push(ev.target.result);
-          renderAttachedImages();
-        };
-        reader.readAsDataURL(file);
+      function readAsText(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(String(ev.target.result || ''));
+          reader.onerror = () => reject(reader.error || new Error('unreadable'));
+          reader.readAsText(file);
+        });
+      }
+
+      function readAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(String(ev.target.result || ''));
+          reader.onerror = () => reject(reader.error || new Error('unreadable'));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Shared by the file picker, paste and drag-and-drop.
+      async function addAttachmentFiles(fileList) {
+        const problems = [];
+        for (const file of fileList) {
+          if (file.type.startsWith('image/')) {
+            if (file.size > IMAGE_MAX_BYTES) { problems.push(file.name + ' is larger than 8 MB'); continue; }
+            if (S.pendingImages.length >= MAX_IMAGES) { problems.push('Only ' + MAX_IMAGES + ' images can be attached at once'); continue; }
+            try { S.pendingImages.push(await readAsDataUrl(file)); }
+            catch { problems.push(file.name + ' could not be read'); }
+          } else if (isTextFile(file)) {
+            if (file.size > FILE_MAX_BYTES) { problems.push(file.name + ' is larger than 256 KB'); continue; }
+            try { S.pendingFiles.push({ name: file.name, size: file.size, text: await readAsText(file) }); }
+            catch { problems.push(file.name + ' could not be read'); }
+          } else {
+            problems.push(file.name + ' is not an image or a text file');
+          }
+        }
+        renderAttachments();
+        if (problems.length) await modalAlert(problems.join('\n'), 'Not attached');
+      }
+
+      if ($('fileUpload')) $('fileUpload').onchange = async e => {
+        const files = [...e.target.files];
         e.target.value = '';
+        if (files.length) await addAttachmentFiles(files);
       };
 
       window.addEventListener('paste', e => {
-        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        const items = (e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData) || {}).items || [];
+        const files = [];
         for (const item of items) {
-          if (item.type.indexOf('image') === 0) {
-            const blob = item.getAsFile();
-            const reader = new FileReader();
-            reader.onload = ev => {
-              S.pendingImages.push(ev.target.result);
-              renderAttachedImages();
-            };
-            reader.readAsDataURL(blob);
-          }
+          if (item.kind !== 'file') continue;
+          const file = item.getAsFile();
+          if (file) files.push(file);
         }
+        if (files.length) addAttachmentFiles(files);
       });
 
-      // ---------- drag & drop image upload ----------
+      // ---------- drag & drop attachments ----------
       let dragCounter = 0;
       ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
         window.addEventListener(evt, e => e.preventDefault(), false);
@@ -2014,17 +2191,199 @@ try {
         document.body.classList.remove('drag-active');
         const files = e.dataTransfer && e.dataTransfer.files;
         if (!files || !files.length) return;
-        for (const file of files) {
-          if (file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = ev => {
-              S.pendingImages.push(ev.target.result);
-              renderAttachedImages();
-            };
-            reader.readAsDataURL(file);
-          }
-        }
+        addAttachmentFiles([...files]);
       });
+
+      // ---------- microphone dictation ----------
+      // Preferred path: record with MediaRecorder and transcribe through the
+      // provider's OpenAI-compatible /audio/transcriptions endpoint. Fallback:
+      // the Web Speech API, for providers with no transcription endpoint.
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+      const canRecord = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+      let micState = null;
+
+      function setMicButton(recording, title) {
+        const b = $('btnMic');
+        if (!b) return;
+        b.classList.toggle('rec', !!recording);
+        b.textContent = recording ? '⏹ Stop' : '🎤 Speak';
+        b.title = title || (recording ? 'Stop and transcribe' : 'Dictate with your microphone');
+      }
+
+      const micBaseValue = () => ($('input').value || '').replace(/\s+$/, '');
+
+      function insertDictation(text) {
+        if (!text || !text.trim()) return;
+        const base = micBaseValue();
+        $('input').value = base ? base + ' ' + text.trim() : text.trim();
+        $('input').focus();
+      }
+
+      async function sttConfig() {
+        const provider = S.cfg.cloudProvider || 'gateway';
+        // These providers expose no /audio/transcriptions endpoint.
+        if (['anthropic', 'gemini', 'openrouter'].includes(provider)) return null;
+        const model = (S.cfg.sttModel || '').trim() ||
+          (provider === 'groq' ? 'whisper-large-v3-turbo' : 'whisper-1');
+        let base;
+        if (provider === 'groq') base = 'https://api.groq.com/openai';
+        else if (provider === 'openai') base = 'https://api.openai.com';
+        else {
+          base = await getApiBase();
+          if (base === null || base === undefined) return null;
+        }
+        return { base: base || '', key: S.cfg.directKey || S.cfg.key || '', model };
+      }
+
+      async function transcribeBlob(blob, type) {
+        let cfg;
+        try { cfg = await sttConfig(); } catch { cfg = null; }
+        if (!cfg) {
+          await modalAlert(
+            'This provider has no speech-to-text endpoint. Switch the provider to OpenAI, Groq, or your gateway in Setup, or type instead.',
+            'Dictation unavailable'
+          );
+          return;
+        }
+        const statusEl = $('status');
+        const previous = statusEl ? statusEl.textContent : '';
+        if (statusEl) statusEl.textContent = 'Transcribing…';
+        try {
+          const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+          const fd = new FormData();
+          fd.append('file', blob, 'dictation.' + ext);
+          fd.append('model', cfg.model);
+          const headers = {};
+          if (cfg.key) headers.Authorization = 'Bearer ' + cfg.key;
+          const r = await fetch((cfg.base || '') + '/v1/audio/transcriptions', { method: 'POST', headers, body: fd });
+          if (!r.ok) {
+            let detail = r.status + ' ' + r.statusText;
+            try { const j = await r.json(); detail = (j.error && (j.error.message || j.error)) || detail; } catch { }
+            throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+          }
+          const j = await r.json();
+          const text = (j.text || '').trim();
+          if (text) insertDictation(text);
+          else await modalAlert('No speech was recognised. Try again closer to the microphone.', 'Nothing heard');
+        } catch (e) {
+          await modalAlert('Transcription failed: ' + (e && e.message ? e.message : e), 'Dictation error');
+        } finally {
+          if (statusEl) statusEl.textContent = previous;
+        }
+      }
+
+      async function startRecording() {
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          const denied = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError');
+          await modalAlert(
+            denied
+              ? 'Microphone access was blocked. Allow Roundtable in System Settings → Privacy & Security → Microphone, then try again.'
+              : 'Could not open the microphone: ' + (e && e.message ? e.message : e),
+            'Microphone unavailable'
+          );
+          return false;
+        }
+
+        const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
+        const mimeType = candidates.find(t => {
+          try { return window.MediaRecorder.isTypeSupported(t); } catch { return false; }
+        }) || '';
+        let recorder;
+        try { recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined); }
+        catch { recorder = new MediaRecorder(stream); }
+
+        const chunks = [];
+        recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+        recorder.onstop = async () => {
+          stream.getTracks().forEach(t => t.stop());
+          micState = null;
+          setMicButton(false);
+          const type = recorder.mimeType || mimeType || 'audio/webm';
+          const blob = new Blob(chunks, { type });
+          if (blob.size) await transcribeBlob(blob, type);
+        };
+
+        micState = { recorder, stream };
+        setMicButton(true);
+        recorder.start();
+        return true;
+      }
+
+      function startSpeechRecognition() {
+        const recog = new SpeechRec();
+        recog.lang = navigator.language || 'en-US';
+        recog.interimResults = true;
+        recog.continuous = false;
+        const base = micBaseValue();
+        let fellBack = false;
+        micState = { recog };
+        setMicButton(true, 'Listening… click to stop');
+
+        recog.onresult = ev => {
+          let interim = '', final = '';
+          for (let i = 0; i < ev.results.length; i++) {
+            const r = ev.results[i];
+            if (r.isFinal) final += r[0].transcript;
+            else interim += r[0].transcript;
+          }
+          const spoken = (final + interim).trim();
+          $('input').value = [base, spoken].filter(Boolean).join(' ');
+        };
+        recog.onerror = ev => {
+          const reason = ev && ev.error ? ev.error : 'unknown';
+          // The webview exposes the API but the platform service may be
+          // unavailable; fall back to recording when the provider can
+          // transcribe (Windows WebView2, some Linux builds).
+          if ((reason === 'network' || reason === 'service-not-allowed') && canRecord) {
+            fellBack = true;
+            return;
+          }
+          if (reason === 'not-allowed') {
+            modalAlert('Microphone access was blocked. Allow Roundtable in System Settings → Privacy & Security → Microphone, then try again.', 'Microphone blocked');
+          } else if (reason !== 'aborted' && reason !== 'no-speech') {
+            modalAlert('Dictation stopped: ' + reason, 'Microphone');
+          }
+        };
+        recog.onend = async () => {
+          micState = null;
+          if (fellBack && canRecord) {
+            fellBack = false;
+            if (await startRecording()) return;
+          }
+          setMicButton(false);
+        };
+        recog.start();
+      }
+
+      async function toggleMic() {
+        if (micState) {
+          try {
+            if (micState.recorder && micState.recorder.state !== 'inactive') micState.recorder.stop();
+            if (micState.recog) micState.recog.stop();
+          } catch { }
+          return;
+        }
+        // The Web Speech API needs no setup and is available in the macOS
+        // webview, so it is tried first. Recording + a transcription endpoint
+        // is the fallback (and the primary path when the webview has no
+        // speech service).
+        if (SpeechRec) { startSpeechRecognition(); return; }
+        if (canRecord) {
+          try { if (await sttConfig()) { if (await startRecording()) return; } } catch { }
+        }
+        await modalAlert(
+          'This build has no microphone support. Use Chrome or Edge, or type your message.',
+          'Dictation unavailable'
+        );
+      }
+
+      if ($('btnMic')) {
+        if (!SpeechRec && !canRecord) $('btnMic').style.display = 'none';
+        $('btnMic').onclick = toggleMic;
+      }
 
       // ---------- setup drawer ----------
       function openSetup(msg) {
@@ -2667,10 +3026,9 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
           if (lastUser) {
             e.preventDefault();
             $('input').value = lastUser.text || '';
-            if (lastUser.images && lastUser.images.length) {
-              S.pendingImages = [...lastUser.images];
-              renderAttachedImages();
-            }
+            S.pendingImages = lastUser.images ? [...lastUser.images] : [];
+            S.pendingFiles = lastUser.files ? lastUser.files.map(f => ({ ...f })) : [];
+            renderAttachments();
           }
         }
       });
@@ -2746,6 +3104,7 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       if ($('fallback')) $('fallback').oninput = () => { S.cfg.fallback = $('fallback').value; save(); };
       if ($('preamble')) $('preamble').oninput = () => { S.cfg.preamble = $('preamble').value; save(); };
       if ($('maxTokens')) $('maxTokens').oninput = () => { S.cfg.maxTokens = Math.max(0, Number($('maxTokens').value) || 0); save(); };
+      if ($('sttModel')) $('sttModel').oninput = () => { S.cfg.sttModel = $('sttModel').value.trim(); save(); };
 
       // ---------- boot ----------
       const saved = store.get('rt.cfg');
@@ -2791,6 +3150,7 @@ if ($('btnClear')) $('btnClear').onclick = async () => {
       $('fallback').value = S.cfg.fallback == null ? 'auto' : S.cfg.fallback;
       $('preamble').value = S.cfg.preamble || DEFAULT_PREAMBLE;
       $('maxTokens').value = S.cfg.maxTokens || 0;
+      if ($('sttModel')) $('sttModel').value = S.cfg.sttModel || '';
 
       if (S.cfg.previewOpen === false) {
         $('previewPane').classList.add('collapsed');

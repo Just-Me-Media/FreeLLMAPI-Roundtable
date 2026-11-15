@@ -1,13 +1,44 @@
 # Roundtable Cross-Platform HANDOFF & Architecture Status
 
 **Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable
-**Last updated:** 2026-11-15 — v0.2.4
+**Last updated:** 2026-11-15 — v0.2.5
 
-## Current State (v0.2.4)
+## Current State (v0.2.5)
+
+### What changed in 0.2.5 — composer attachments and dictation
+
+- **Drag and drop + Attach button.** The composer accepts images and text files
+  from the 📎 button, a paste, or a drop anywhere on the window. Images become
+  OpenAI `image_url` content parts (Anthropic receives base64 `image` blocks and
+  `x-api-key` + `anthropic-dangerous-direct-browser-access`); text files up to
+  256 KB are inlined as fenced `[Attached file: name]` blocks so every model sees
+  them. Images are capped at 8 MB, eight per message; other file types are
+  rejected with an alert.
+- **`dragDropEnabled: false`** in both Tauri window configs. Tauri's native drag
+  handler would otherwise swallow the drop before HTML5 `drop` fires.
+- **Microphone dictation.** 🎤 Speak tries the Web Speech API first (the macOS
+  WKWebView exposes `webkitSpeechRecognition` but not `navigator.mediaDevices`)
+  and falls back to `MediaRecorder` + the provider's
+  `/v1/audio/transcriptions` endpoint when speech returns `network` /
+  `service-not-allowed`. Providers without a transcription endpoint
+  (Anthropic, Gemini, OpenRouter) show a clear message. Default STT models:
+  `whisper-1` (OpenAI/gateway), `whisper-large-v3-turbo` (Groq); override in
+  Setup → Turn Rules.
+- **Permissions.** New `src-tauri/Info.plist` carries
+  `NSMicrophoneUsageDescription` and `NSSpeechRecognitionUsageDescription` (the
+  bundler merges it into the app), and `entitlements.plist` gained
+  `com.apple.security.device.audio-input` for the hardened runtime.
+- **Tests.** `npm test` now covers the mic transcript insertion, dropping a text
+  file and a PNG, chips clearing on send, and the resulting `content` parts
+  (`text` with the file body, `image_url` data URL). The full e2e suite and
+  `npm run smoke` are green.
+- **Manual check still required:** macOS TCC prompts only appear in the signed
+  app. Press 🎤 Speak once on a real install and allow microphone + speech
+  recognition; confirm the transcript lands in the input box.
 
 ### macOS — one universal build, signed and notarized
 
-- **Artifact:** `Roundtable_0.2.4_universal.dmg` — runs natively on Apple Silicon
+- **Artifact:** `Roundtable_0.2.5_universal.dmg` — runs natively on Apple Silicon
   **and** Intel Macs. Earlier releases were `aarch64` only.
 - **Architectures:** `lipo -archs` reports `x86_64 arm64` for the bundled binary.
   `scripts/notarize.sh` fails the build if a "universal" artifact turns out to be
@@ -18,11 +49,11 @@
   **first**, the DMG is rebuilt from that stapled app, then the DMG is signed,
   notarized and stapled. Notarizing only the DMG leaves the copied `.app`
   without a ticket and offline first launch fails.
-- **Installed build:** `/Applications/Roundtable.app` → 0.2.4, `spctl` reports
+- **Installed build:** `/Applications/Roundtable.app` → 0.2.5, `spctl` reports
   `source=Notarized Developer ID`.
-- **Size:** 14,160,364 bytes
-- **SHA-256:** `4626cadc0d46d6edfbe37437200674cac8f118a25d108c11271ebf3fe7183980`
-- **Notary submission IDs:** app `b74cea96-34ce-45ac-8774-d885a9b49f38`, DMG `132d1ed6-bf58-4760-bfed-05f83e787599` (both Accepted).
+- **Size:** 14,171,917 bytes
+- **SHA-256:** `fe28aad05d108ce742da699aa95c0a27a85ba049ac1a131fee93f1ef4ed61d00`
+- **Notary submission IDs:** app `2dce01d6-5105-4723-9d8c-14e08443a86c`, DMG `33cc2c20-00e4-4282-a186-644be361b05d` (both Accepted).
 - **Manifest:** `updates.json` lists **both** `darwin-aarch64` and
   `darwin-x86_64`, pointing at the same universal DMG with the same signature.
   The updater picks its entry from the CPU it is running on, so a universal

@@ -20,6 +20,24 @@ const check = (cond, msg) => {
     // 401/429 responses are expected in this test and show up as console noise.
     page.on('console', m => { if (m.type() === 'error' && !m.text().includes('Failed to load resource')) errors.push(m.text()); });
 
+    // Stand in for the Web Speech API. The macOS webview exposes a real one;
+    // Chromium headless does not, so dictation is exercised with this fake.
+    await page.addInitScript(() => {
+      class FakeRecognition {
+        constructor() { window.__lastRecognition = this; }
+        start() {
+          setTimeout(() => {
+            const result = [{ transcript: 'dictated words' }];
+            result.isFinal = true;
+            if (this.onresult) this.onresult({ results: [result] });
+            if (this.onend) this.onend();
+          }, 30);
+        }
+        stop() { if (this.onend) this.onend(); }
+      }
+      window.SpeechRecognition = FakeRecognition;
+    });
+
     await page.goto(stack.base);
     await page.waitForFunction(() => document.getElementById('status').textContent.includes('connected'));
     check(true, 'health shows gateway connected');
@@ -55,6 +73,14 @@ const check = (cond, msg) => {
     await page.locator('textarea[data-field=role]').first().fill('Draft the first answer.');
     await page.click('#btnClose');
     check(/5 models × 1 round = 5 (?:requests|req\/msg)/.test(await page.textContent('#roundHint')), 'request-cost hint is shown');
+
+    // Dictation: the Speak button turns the recognised speech into text.
+    check(await page.locator('#btnMic').isVisible(), 'mic button is shown');
+    await page.click('#btnMic');
+    await page.waitForFunction(() => document.getElementById('input').value.includes('dictated words'));
+    check((await page.inputValue('#input')).trim() === 'dictated words', 'dictation inserts the transcript');
+    check((await page.textContent('#btnMic')).includes('Speak'), 'mic button returns to Speak after dictating');
+    await page.fill('#input', '');
 
     // One message, five models
     await page.fill('#input', 'What is 2+2?');
@@ -105,6 +131,47 @@ const check = (cond, msg) => {
     await page.click('#btnStop');
     await page.waitForFunction(() => !document.getElementById('btnSend').disabled, null, { timeout: 5000 });
     check(true, 'Stop ends the run and re-enables Send');
+
+    // Drag and drop: a text file and an image become attachments and reach the
+    // model as a text block plus an image_url content part.
+    const attachFrom = stack.requests().length;
+    await page.evaluate(() => {
+      const png = Uint8Array.from(atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+      ), c => c.charCodeAt(0));
+      const dt = new DataTransfer();
+      dt.items.add(new File(['alpha beta\ngamma delta'], 'notes.txt', { type: 'text/plain' }));
+      dt.items.add(new File([png], 'dot.png', { type: 'image/png' }));
+      for (const type of ['dragenter', 'dragover', 'drop']) {
+        window.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt }));
+      }
+    });
+    await page.waitForSelector('#attachedImages .file-chip');
+    check((await page.textContent('#attachedImages .file-chip .fname')).includes('notes.txt'),
+      'dropping a text file adds a file chip');
+    check(await page.locator('#attachedImages .img-chip').count() === 1,
+      'dropping an image adds an image chip');
+    check(await page.locator('body.drag-active').count() === 0,
+      'drop clears the drag overlay');
+
+    await page.click('#btnSend');
+    await page.waitForFunction(() => !document.getElementById('btnSend').disabled, null, { timeout: 20000 });
+    check(await page.locator('#attachedImages .img-chip, #attachedImages .file-chip').count() === 0,
+      'attachments clear from the composer after sending');
+    const attachedMsgs = await page.locator('.msg .msg-files').count();
+    check(attachedMsgs === 1, 'sent message shows the attached file');
+
+    const attachReqs = stack.requests().slice(attachFrom);
+    const firstAttach = attachReqs.find(r => r.model === 'Dots3 Note Preview');
+    const attachTurn = [...firstAttach.messages].reverse().find(m => m.role === 'user');
+    check(Array.isArray(attachTurn.content), 'attachment turn uses content parts');
+    const textPart = attachTurn.content.filter(p => p.type === 'text')
+      .find(p => p.text.includes('[Attached file: notes.txt]'));
+    const imagePart = attachTurn.content.find(p => p.type === 'image_url');
+    check(!!textPart && textPart.text.includes('[Attached file: notes.txt]') && textPart.text.includes('alpha beta\ngamma delta'),
+      'text file contents are inlined into the prompt');
+    check(!!imagePart && imagePart.image_url.url.startsWith('data:image/png;base64,'),
+      'image is sent as an image_url data URL');
 
     // Non-forced update offer: advertises the new version, installs nothing.
     await page.evaluate(async () => {
