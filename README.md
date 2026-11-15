@@ -31,10 +31,12 @@ Works for writing, research, decisions, code review, marketing copy, study guide
 ## Download
 
 ### macOS (Apple Silicon)
-[Roundtable_0.2.1_aarch64.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/tag/v0.2.1) — requires macOS 12+
+[Roundtable_0.2.1_aarch64.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.1/Roundtable_0.2.1_aarch64.dmg) — requires macOS 12+
 
 ### Windows
-[Roundtable-Windows-x64-v0.2.1.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/tag/v0.2.1) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/tag/v0.2.1) — requires Windows 10/11 64-bit
+[Roundtable_0.2.1_x64-setup.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.1/Roundtable_0.2.1_x64-setup.exe) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.1/Roundtable_0.2.1_x64_en-US.msi) — requires Windows 10/11 64-bit
+
+Windows installers are unsigned, so SmartScreen may show "Windows protected your PC" — choose **More info → Run anyway**.
 
 ### Web (Node.js server)
 Run it in any browser — no installation needed beyond Node.js 18+.
