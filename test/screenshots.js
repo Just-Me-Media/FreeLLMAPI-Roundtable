@@ -11,14 +11,29 @@ const { startStack, loadPlaywright } = require('./helpers');
   try {
     const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, deviceScaleFactor: 2 });
     await page.goto(stack.base);
+    // Setup opens on the Turn Rules tab, so switch to Cloud Models to load.
+    await page.click('[data-tab="tab-cloud"]');
+    await page.selectOption('#cloudProvider', 'gateway');
     await page.fill('#key', 'freellmapi-test');
     await page.click('#btnLoad');
     await page.waitForFunction(() => document.getElementById('loadNote').textContent.includes('models loaded'));
-    await page.click('#btnQuick');
-    await page.locator('[data-rm]').last().click(); // keep three at the table
+    // A deliberate three-model lineup reads better than Quick Start's picks
+    // (which can include the mock's failing "broken-model"). The model list
+    // lives on the Cloud Models tab.
+    for (const model of ['GPT-OSS 120B', 'Muse Glimmer 30B', 'Dots3 Note Preview']) {
+      await page.fill('#search', model.split(' ')[0].toLowerCase());
+      await page.click(`[data-add="${model}"]`);
+    }
+    await page.click('[data-tab="tab-rules"]');
     const roles = ['Draft the first answer.', 'Critique the answers so far.', 'Write the final summary.'];
     for (let i = 0; i < roles.length; i++) await page.locator('textarea[data-field=role]').nth(i).fill(roles[i]);
-    await page.evaluate(() => { document.querySelector('.drawer').scrollTop = 0; });
+    // Frame the lineup (models + role instructions), not the boilerplate above it.
+    await page.evaluate(() => {
+      const drawer = document.querySelector('[aria-label="Setup"]');
+      const heading = [...drawer.querySelectorAll('*')]
+        .find(el => el.children.length === 0 && /ACTIVE TABLE LINEUP/i.test(el.textContent));
+      if (heading) drawer.scrollTop = heading.getBoundingClientRect().top - drawer.getBoundingClientRect().top + drawer.scrollTop - 24;
+    });
     await page.screenshot({ path: path.join(__dirname, '..', 'docs', 'setup.png') });
 
     await page.click('#btnClose');

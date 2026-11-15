@@ -30,13 +30,21 @@ Works for writing, research, decisions, code review, marketing copy, study guide
 
 ## Download
 
-### macOS (Apple Silicon)
-[Roundtable_0.2.1_aarch64.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.1/Roundtable_0.2.1_aarch64.dmg) — requires macOS 12+
+### macOS — Apple Silicon and Intel
+[Roundtable_0.2.4_universal.dmg](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_universal.dmg) — requires macOS 12+, one universal build for both architectures, signed and notarized.
+
+Or install with Homebrew:
+
+```bash
+brew install --cask just-me-media/tap/roundtable
+```
 
 ### Windows
-[Roundtable_0.2.1_x64-setup.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.1/Roundtable_0.2.1_x64-setup.exe) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.1/Roundtable_0.2.1_x64_en-US.msi) — requires Windows 10/11 64-bit
+[Roundtable_0.2.4_x64-setup.exe](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_x64-setup.exe) · [.msi](https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/download/v0.2.4/Roundtable_0.2.4_x64_en-US.msi) — requires Windows 10/11 64-bit
 
 Windows installers are unsigned, so SmartScreen may show "Windows protected your PC" — choose **More info → Run anyway**.
+
+Once installed, Roundtable checks for updates on launch and offers them with **Install** or **Later**. Nothing downloads or installs unless you choose Install.
 
 ### Web (Node.js server)
 Run it in any browser — no installation needed beyond Node.js 18+.
@@ -122,9 +130,21 @@ Assign any of these to a model slot. Templates assign them automatically.
 
 ### macOS
 ```bash
-npm run build:mac    # builds .app
-npm run build:dmg    # builds signed + notarized .dmg
-npm run verify       # health checks
+npm run build:mac     # builds .app for this Mac's architecture
+npm run build:dmg     # universal .dmg, signed + notarized + stapled
+npm run verify        # health checks
+```
+
+`npm run build:dmg` produces one universal binary that runs natively on both Apple Silicon and Intel Macs. It needs both Rust targets once:
+
+```bash
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+```
+
+For a faster local check that only builds this Mac's architecture:
+
+```bash
+NATIVE=1 ./scripts/build-and-notarize.sh
 ```
 
 ### Windows (run on Windows machine)

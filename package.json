@@ -1,6 +1,6 @@
 {
   "name": "roundtable",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Bring local and cloud AI models into one role-based shared conversation.",
   "private": true,
   "license": "MIT",
@@ -14,7 +14,8 @@
     "screenshots": "node test/screenshots.js",
     "verify": "bash scripts/verify-install.sh",
     "build:install": "RUSTC_WRAPPER='' cargo tauri build --bundles app && bash scripts/install-app.sh",
-    "manifest": "node scripts/updates-manifest.js"
+    "manifest": "node scripts/updates-manifest.js",
+    "cask": "bash scripts/make-cask.sh"
   },
   "engines": {
     "node": ">=18"

@@ -1,87 +1,154 @@
 # Roundtable Cross-Platform HANDOFF & Architecture Status
 
-**Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable  
+**Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable
+**Last updated:** 2026-11-15 — v0.2.4
 
-## Current State (v0.2.1)
+## Current State (v0.2.4)
 
-- **macOS Build:** ✅ **Complete & Verified.**
-  - Notarized + stapled Developer ID build installed at `/Applications/Roundtable.app` (0.2.1).
-  - `updates.json` published on the `v0.2.1` release with a `darwin-aarch64` entry.
-  - Storage architecture (`src/storage/*`) bundled inside the app.
-  - Updater signing key: `6E8C99D71D9B2B5A` (same key baked into both configs).
+### macOS — one universal build, signed and notarized
 
-- **Windows Build:** ✅ **Built by CI, installed, and verified for 0.2.1.**
-  - Built by the `Release Windows` workflow (run `43558939733`, 5m56s, `windows-latest`) from tag `v0.2.1` at `a858903`, using the same `build-windows.ps1` the ThinkCentre uses.
-  - NSIS installer: 4,298,813 bytes — SHA-256 `775356C5D68C1A7623EB1817138750BBF30A454F71B90928083DDF1F03E7AAF6`
-  - MSI: 6,410,240 bytes
-  - Installed on the ThinkCentre; `app.exe` reports file/product version `0.2.1` (18,918,912 bytes).
-  - Verified on that installed build via WebView2 remote debugging (port 9222):
-    - All storage modules load over `http://tauri.localhost/` (`src/index.js` + 7 modules, HTTP 200); `window.storage` initialised with all five managers.
-    - `FreeLLMAPI connected (http://127.0.0.1:31415)`; "Load FreeLLMAPI Models" loaded 399 models.
-    - Artifact "Save As…" wrote `ci-artifact.md` into the folder picked in the native dialog; `Documents\Roundtable` stayed empty.
-    - Updater `check()` returns `null` without error (already on 0.2.1).
-    - Turn Rules is the default active tab; prompt textarea `min-height` is 120px.
-  - `cargo test` passes (2 Rust tests for safe artifact filenames).
+- **Artifact:** `Roundtable_0.2.4_universal.dmg` — runs natively on Apple Silicon
+  **and** Intel Macs. Earlier releases were `aarch64` only.
+- **Architectures:** `lipo -archs` reports `x86_64 arm64` for the bundled binary.
+  `scripts/notarize.sh` fails the build if a "universal" artifact turns out to be
+  single-architecture.
+- **Signing:** Developer ID Application (Team `C76T5D27A2`), hardened runtime,
+  secure timestamp, `src-tauri/entitlements.plist`.
+- **Order of operations matters:** the `.app` is signed, notarized and stapled
+  **first**, the DMG is rebuilt from that stapled app, then the DMG is signed,
+  notarized and stapled. Notarizing only the DMG leaves the copied `.app`
+  without a ticket and offline first launch fails.
+- **Installed build:** `/Applications/Roundtable.app` → 0.2.4, `spctl` reports
+  `source=Notarized Developer ID`.
+- **Size:** 14,160,364 bytes
+- **SHA-256:** `4626cadc0d46d6edfbe37437200674cac8f118a25d108c11271ebf3fe7183980`
+- **Notary submission IDs:** app `b74cea96-34ce-45ac-8774-d885a9b49f38`, DMG `132d1ed6-bf58-4760-bfed-05f83e787599` (both Accepted).
+- **Manifest:** `updates.json` lists **both** `darwin-aarch64` and
+  `darwin-x86_64`, pointing at the same universal DMG with the same signature.
+  The updater picks its entry from the CPU it is running on, so a universal
+  app on either architecture finds the right artifact.
 
-- **Windows release status:** ✅ **Published on `v0.2.1`.**
-  - Assets: `Roundtable_0.2.1_x64-setup.exe` and `Roundtable_0.2.1_x64_en-US.msi`.
-  - The release's `updates.json` carries **both** `darwin-aarch64` and `windows-x86_64`, signed with key id `6E8C99D71D9B2B5A`.
-  - Signature verified out-of-band against the pubkey baked into `src-tauri/tauri.conf.json`: minisign prehashed mode (`ED`), BLAKE2b-512 over the installer, key id matches. This is the exact check the updater performs on download.
-  - Tag `v0.2.1` points at `a858903`, the exact commit the workflow built.
+### Windows — built by CI
 
-  **Release process (one path, used locally and in CI):**
-  1. Bump `version` in `src-tauri/tauri.conf.json` (and `package.json`), commit, push.
-  2. Tag it: `git tag v<version>; git push origin v<version>` (the workflow will create the tag if you skip this).
-  3. Run **Release Windows** (`.github/workflows/release.yml`):
-     ```powershell
-     gh workflow run release.yml `
-       --repo Just-Me-Media/FreeLLMAPI-Roundtable --ref v0.2.1
-     ```
-     It runs `build-windows.ps1` on `windows-latest` (the same script the
-     ThinkCentre uses), signs the NSIS installer with the
-     `TAURI_SIGNING_PRIVATE_KEY` secret, merges the `windows-x86_64` entry into
-     the release's `updates.json` (keeping `darwin-aarch64`) and publishes the
-     NSIS + MSI installers.
-  - The tag is derived from `tauri.conf.json`, so a tag can never disagree with
-    the binaries inside it. Dispatching a branch whose tag already points at
-    other code fails on purpose.
-  - Local build for testing (no publishing):
-    `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1`
-  - GitHub Actions minutes are free for public repositories, so this costs
-    nothing.
+- Built by the **Release Windows** workflow (`.github/workflows/release.yml`,
+  `windows-latest`) from tag `v0.2.4`, using the same `build-windows.ps1` the
+  ThinkCentre uses.
+- Output: `Roundtable_0.2.4_x64-setup.exe` (NSIS) and
+  `Roundtable_0.2.4_x64_en-US.msi`.
+- Installers are **unsigned**, so SmartScreen shows "Windows protected your PC"
+  until Azure Trusted Signing is enabled. Deferred on purpose: the $200 trial
+  credit runs for 30 days from signup and Microsoft's business-identity
+  verification takes days, so sign up ~1–2 weeks before a public push.
+- Installed copy on the ThinkCentre is the manual verification path for
+  desktop-only behaviour (native dialogs, updater, WebView2). The e2e suite
+  runs on Chromium only.
 
-  **Signing key:** the only valid private key is the repo secret
-  `TAURI_SIGNING_PRIVATE_KEY` (key id `6E8C99D71D9B2B5A`). No key file lives in
-  the tree; `.gitignore` excludes `*.key` and `*.sig`. The stale
-  `src-tauri/updater.key` (key id `13FADAED9706926B`, not trusted by the app) was
-  removed and backed up to
-  `C:\Temp\Roundtable\stale-updater-13FADAED9706926B.key.bak`.
+### Auto-update
 
-  **One-time migration:** the signing key was rotated in 0.2.1 (old key id
-  `D2B0F1370F1F4C9D`). Builds of **0.2.0 and older will reject the 0.2.1 update**
-  because they still trust the old key, so anyone on 0.2.0 must install 0.2.1
-  manually once. From 0.2.1 onward auto-update works normally.
+- Endpoint: `https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/latest/download/updates.json`
+  (HTTP 200 is the health check — a 404 silently disables updates).
+- Trusted pubkey: `6E8C99D71D9B2B5A` (baked into `src-tauri/tauri.conf.json` and
+  `tauri.windows.conf.json`; private key only in `updater.key` locally and the
+  `TAURI_SIGNING_PRIVATE_KEY` repo secret).
+- **Offer, never force.** `startupUpdateCheck()` runs 5 seconds after launch in
+  the desktop app, checks once, and shows an "Update available" confirm dialog
+  with Install / Later. Nothing downloads or installs without Install.
+- Declining stores `rt.updateSkipped = <version>`, so the same release is never
+  offered twice. The header button still installs on demand and changes to
+  **🔄 Update available** when one exists.
+- The check waits for the Setup drawer to close, and network failures are
+  logged and ignored (never surfaced at startup).
+- **Version floor:** the startup check first shipped in 0.2.3. Any 0.2.2 or
+  older install cannot see 0.2.3+ automatically and needs one manual update
+  (🔄 Update button or reinstall). From 0.2.3 onward this is automatic.
+- **Key rotation:** 0.2.0 and older trust the lost key `D2B0F1370F1F4C9D` and
+  must reinstall once. 0.2.1+ trust `6E8C99D71D9B2B5A`.
 
-## Build checklist (Windows ThinkCentre)
+### Distribution
+
+- **Direct download** from the GitHub release (DMG + NSIS + MSI + `updates.json`).
+- **Homebrew cask:** `Casks/roundtable.rb`, generated by `npm run cask` from the
+  exact notarized DMG (so the checksum always matches the published file).
+  Published through the tap repo `Just-Me-Media/homebrew-tap`:
+  ```bash
+  brew install --cask just-me-media/tap/roundtable
+  ```
+- **winget:** not yet — it requires a signed installer, so it follows Azure
+  Trusted Signing.
+
+## Release process (one path for both platforms)
+
+1. Bump the version in `package.json`, `src-tauri/tauri.conf.json`,
+   `src-tauri/tauri.windows.conf.json`, `src-tauri/Cargo.toml` and the `app`
+   entry in `src-tauri/Cargo.lock`. They are four separate files plus the lock
+   file; keep them in sync or the bundle metadata disagrees with the tag.
+2. `npm test` (and `npm run smoke`) — must be green before anything ships.
+3. `./scripts/build-and-notarize.sh` — universal macOS build, sign, notarize,
+   staple, assemble `releases/v<version>/`, write `updates.json`.
+   `NATIVE=1 ./scripts/build-and-notarize.sh` builds only this Mac's
+   architecture and is **not** suitable for release.
+4. `npm run cask` — regenerate `Casks/roundtable.rb` with the new checksum.
+5. Commit and push `main`.
+6. Publish the macOS side, which also creates the tag:
+   ```bash
+   gh release create v<version> releases/v<version>/Roundtable_<version>_universal.dmg \
+     releases/v<version>/updates.json --target main --title "Roundtable v<version>" --notes "..."
+   ```
+   The tag push automatically starts **Release Windows**; do not also dispatch it.
+7. Verify:
+   ```bash
+   curl -sSL -o /dev/null -w '%{http_code}\n' \
+     https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable/releases/latest/download/updates.json
+   ```
+   Expect `200`, and both `darwin-aarch64`, `darwin-x86_64` and
+   `windows-x86_64` under `platforms`.
+8. Copy the updated cask into the tap repo and push it.
+
+## macOS build checklist
+
+1. Both Rust targets installed (universal builds need both):
+   ```bash
+   rustup target add aarch64-apple-darwin x86_64-apple-darwin
+   ```
+2. Notary credentials stored once:
+   ```bash
+   xcrun notarytool store-credentials "roundtable-notary" \
+     --apple-id "billcommu@icloud.com" --team-id "C76T5D27A2"
+   ```
+3. `./scripts/build-and-notarize.sh` prints eight notarization steps and ends
+   with the notarized DMG. It fails loudly on:
+   - a missing/ambiguous Developer ID certificate (resolved to a SHA-1),
+   - a missing hardened runtime or secure timestamp,
+   - a single-architecture "universal" binary,
+   - an app inside the DMG without its own stapled ticket,
+   - a notary submission that comes back `Invalid` (prints the log).
+4. `scripts/updates-manifest.js` refuses to sign with a key whose id does not
+   match the pubkey baked into the app.
+
+## Windows build checklist (ThinkCentre)
 
 1. Node server test
-   - `node server.js` runs locally, proxies to FreeLLMAPI :31415 ✅
+   - `node server.js` runs locally, proxies to FreeLLMAPI :31415
    - `/health` endpoint returns upstream true
 
 2. Frontend dist
    - `dist/index.html` must exist before Tauri bundling
-   - `build-windows.ps1` copies `index.html` → `dist/` and `src/` → `dist/src/` (the bundled app imports `./src/index.js`). `tauri.windows.conf.json` repeats this copy in its PowerShell `beforeBuildCommand` so CI builds get it too.
+   - `build-windows.ps1` copies `index.html` → `dist/` and `src/` → `dist/src/`
+     (the bundled app imports `./src/index.js`). `tauri.windows.conf.json`
+     repeats this copy in its PowerShell `beforeBuildCommand` so CI builds get
+     it too.
+   - `dist/` is gitignored; `dist/index.html` is not a tracked file.
 
 3. Tauri Windows config
    - `src-tauri/tauri.windows.conf.json` used
    - `bundle.targets: ["msi","nsis"]` only — no macOS targets
-   - Build command: `cargo tauri build --config tauri.windows.conf.json` (release is default)
+   - Build command: `cargo tauri build --config tauri.windows.conf.json`
+     (release is the default)
 
 4. Artifacts
    - Expected output: `src-tauri/target/release/bundle/...`
      - `Roundtable_<version>_x64_en-US.msi`
      - `Roundtable_<version>_x64-setup.exe` (NSIS)
-
    - For Windows installs, copy to a short path to avoid long-path issues:
      - `C:\Temp\Roundtable\Roundtable.msi`
      - `C:\Temp\Roundtable\RoundtableSetup.exe`
@@ -94,15 +161,15 @@
      `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`
      and drive the page through the Chrome DevTools Protocol.
 
-## Do NOT push changes
-- GitHub Actions not used for this build
-- Zero GitHub minutes consumed — build locally
-- After local test, create a commit and push Windows artifacts (or note release in README). M1 Pro will handle macOS `.dmg` / Linux builds.
+## Config notes
 
-## Notes
-- CRLF vs LF: repo uses LF, Windows build works fine.
-- ExecutionPolicy bypass required for `build-windows.ps1` (`powershell -ExecutionPolicy Bypass -File .\build-windows.ps1`).
-- `beforeBuildCommand` removed from Windows config to avoid `mkdir -p` / `cp` POSIX failures.
+- CRLF vs LF: repo uses LF; Windows builds work fine.
+- ExecutionPolicy bypass required for `build-windows.ps1`
+  (`powershell -ExecutionPolicy Bypass -File .\build-windows.ps1`).
+- GitHub Actions minutes are free for public repositories.
+- Updater signatures are minisign prehashed (`ED`) over BLAKE2b-512. The build
+  script verifies the key id before publishing, and the manifest generator
+  refuses a mismatched key by default.
 
 ## Server Recovery & User Self-Service
 
@@ -145,7 +212,7 @@ Both models are registered in `~/.config/opencode/opencode.jsonc` under the `fre
 
 #### Rebuild the launcher
 
-The AppleScript source is now committed to the repo at `scripts/consensus.applescript`.
+The AppleScript source is committed to the repo at `scripts/consensus.applescript`.
 To rebuild the .app:
 
 ```bash
@@ -161,7 +228,15 @@ Deliberate in Roundtable, then hand the converged plan to OpenCode to build webs
 PDFs, repos, or apps using the same FreeLLMAPI backend.
 
 ## Links
+
+- `scripts/build-and-notarize.sh` — universal macOS release build (build → notarize → manifest)
+- `scripts/notarize.sh` — 8-step sign/notarize/staple pipeline
+- `scripts/updates-manifest.js` — multi-platform updater manifest
+- `scripts/make-cask.sh` — regenerate `Casks/roundtable.rb`
+- `.github/workflows/release.yml` — Windows CI (tag-triggered)
+- `.github/workflows/smoke.yml` — `npm test` + `npm run smoke` on Linux
 - `build-windows.ps1` — one-step Windows builder (syncs `dist/`, runs `cargo tauri build`)
 - `Roundtable-Windows-Start.bat` — post-build launcher (checks FreeLLMAPI, starts proxy, runs app)
 - `scripts/consensus.applescript` — OpenCode Consensus desktop launcher source
+- `test/screenshots.js` — regenerates `docs/chat.png` and `docs/setup.png`
 - CROSS_MACHINE_SYNC.md — sync protocol for Mac/Windows

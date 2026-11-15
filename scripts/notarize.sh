@@ -13,6 +13,7 @@
 # ENV OVERRIDES:
 #   NOTARY_PROFILE   keychain profile name   (default: roundtable-notary)
 #   SIGN_IDENTITY    codesign identity       (default: auto-detect Developer ID Application)
+#   TAURI_TARGET     Rust target directory   (default: universal build if present, else native)
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,24 +21,53 @@ cd "$PROJECT_DIR"
 
 NOTARY_PROFILE="${NOTARY_PROFILE:-roundtable-notary}"
 
-# Resolve arch/version so this works on Apple Silicon and Intel alike.
-RAW_ARCH="$(uname -m)"
-case "$RAW_ARCH" in
-  arm64|aarch64) ARCH="aarch64" ;;
-  x86_64)        ARCH="x86_64"  ;;
-  *)             ARCH="$RAW_ARCH" ;;
+# Resolve the build target so this works on Apple Silicon and Intel alike.
+# Tauri writes universal builds to their own directory; native builds to
+# <arch>-apple-darwin. Prefer an explicit TAURI_TARGET, then a universal
+# build if one exists, then the machine's own architecture.
+if [ -n "${TAURI_TARGET:-}" ]; then
+  TARGET="$TAURI_TARGET"
+elif [ -d "src-tauri/target/universal-apple-darwin/release/bundle/macos" ]; then
+  TARGET="universal-apple-darwin"
+else
+  RAW_ARCH="$(uname -m)"
+  case "$RAW_ARCH" in
+    arm64|aarch64) ARCH="aarch64" ;;
+    x86_64)        ARCH="x86_64"  ;;
+    *)             ARCH="$RAW_ARCH" ;;
+  esac
+  TARGET="${ARCH}-apple-darwin"
+fi
+
+case "$TARGET" in
+  universal-apple-darwin) ARTIFACT_ARCH="universal" ;;
+  *-apple-darwin)         ARTIFACT_ARCH="${TARGET%%-*}" ;;
+  *)                      ARTIFACT_ARCH="$TARGET" ;;
 esac
-TARGET="${ARCH}-apple-darwin"
+
 VERSION="$(python3 -c "import json; print(json.load(open('src-tauri/tauri.conf.json'))['version'])")"
 
 APP="src-tauri/target/${TARGET}/release/bundle/macos/Roundtable.app"
-DMG="src-tauri/target/${TARGET}/release/bundle/dmg/Roundtable_${VERSION}_${ARCH}.dmg"
+DMG="src-tauri/target/${TARGET}/release/bundle/dmg/Roundtable_${VERSION}_${ARTIFACT_ARCH}.dmg"
 BUNDLE_DMG="src-tauri/target/${TARGET}/release/bundle/dmg/bundle_dmg.sh"
 ENTITLEMENTS="src-tauri/entitlements.plist"
 
 # ---------- sanity ----------
 [ -d "$APP" ] || { echo "❌ $APP not found. Run: cargo tauri build --target $TARGET"; exit 1; }
 [ -f "$DMG" ] || { echo "❌ $DMG not found. Run: cargo tauri build --target $TARGET"; exit 1; }
+
+# A universal build that silently produced one architecture would ship broken
+# to half the Macs, so prove both slices are present before signing anything.
+if [ "$TARGET" = "universal-apple-darwin" ]; then
+  MAIN_BIN=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist" 2>/dev/null || true)
+  [ -n "$MAIN_BIN" ] || MAIN_BIN=$(ls "$APP/Contents/MacOS" | head -1)
+  ARCHS=$(lipo -archs "$APP/Contents/MacOS/$MAIN_BIN")
+  echo "🧬 Universal binary: $ARCHS"
+  case "$ARCHS" in
+    *arm64*x86_64*|*x86_64*arm64*) ;;
+    *) echo "❌ Not universal — expected arm64 and x86_64, got: $ARCHS"; exit 1 ;;
+  esac
+fi
 
 # ---------- identity ----------
 # Multiple Developer ID certs can share an identical CN, which makes
@@ -197,6 +227,11 @@ echo "$SIGINFO" | grep -q "^Timestamp=" \
   || { echo "   ❌ secure timestamp missing (notary will reject)"; exit 1; }
 ENT_CNT=$(codesign -d --entitlements :- "$APP" 2>/dev/null | grep -c "com.apple.security" || true)
 echo "   ✅ entitlements present: $ENT_CNT"
+if [ "$TARGET" = "universal-apple-darwin" ]; then
+  MAIN_BIN=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist" 2>/dev/null || true)
+  [ -n "$MAIN_BIN" ] || MAIN_BIN=$(ls "$APP/Contents/MacOS" | head -1)
+  echo "   ✅ architectures after signing: $(lipo -archs "$APP/Contents/MacOS/$MAIN_BIN")"
+fi
 
 # ---------- notarize the app bundle FIRST ----------
 # A ticket is bound to the exact artifact that was notarized. Notarizing only
