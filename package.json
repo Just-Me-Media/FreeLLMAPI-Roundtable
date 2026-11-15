@@ -1,6 +1,6 @@
 {
   "name": "roundtable",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Bring local and cloud AI models into one role-based shared conversation.",
   "private": true,
   "license": "MIT",
