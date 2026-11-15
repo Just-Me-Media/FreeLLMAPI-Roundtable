@@ -2,30 +2,65 @@
 
 **Repo:** https://github.com/Just-Me-Media/FreeLLMAPI-Roundtable  
 
-## Current State (v0.2.0)
+## Current State (v0.2.1)
 
 - **macOS Build:** ✅ **Complete & Verified.**
-  - Installed and verified locally at `/Applications/Roundtable.app`.
-  - Built official Apple Silicon disk image: `src-tauri/target/release/bundle/dmg/Roundtable_0.2.0_aarch64.dmg` (6.1 MB).
-  - Native HTTP plugin fully operational via `__TAURI_PLUGIN_HTTP__` (bypasses WKWebView loopback sandbox issues).
-  - Verification suite active: `npm run verify` passes all 9 health checks.
-  - Rust security audit fixes applied (safe file naming with unit tests, restricted HTTP capability scopes).
-  - Updater plugin registered in `src-tauri/src/lib.rs` and Windows public key fixed.
+  - Notarized + stapled Developer ID build installed at `/Applications/Roundtable.app` (0.2.1).
+  - `updates.json` published on the `v0.2.1` release with a `darwin-aarch64` entry.
+  - Storage architecture (`src/storage/*`) bundled inside the app.
+  - Updater signing key: `6E8C99D71D9B2B5A` (same key baked into both configs).
 
-- **Windows Build (ThinkCentre):** ✅ **Built, installed, and verified.**
-  - Built from `main` with `build-windows.ps1` (no GitHub Actions minutes used).
-  - NSIS installer: `src-tauri/target/release/bundle/nsis/Roundtable_0.2.0_x64-setup.exe`
-  - MSI: `src-tauri/target/release/bundle/msi/Roundtable_0.2.0_x64_en-US.msi`
-  - Staged copies: `C:\Temp\Roundtable\Roundtable-Windows-x64-v0.2.0.exe` / `.msi`
-  - Installed on the ThinkCentre; shortcut points directly at `app.exe`.
-  - Verified via WebView2 remote debugging:
-    - App launches and responds.
-    - FreeLLMAPI `/api/ping` returns 200 and the UI shows `FreeLLMAPI connected (http://127.0.0.1:31415)`.
-    - "Load FreeLLMAPI Models" loaded 327 models.
-    - Artifact "Save As…" writes a file successfully (Windows backslash path fix included).
-    - New chat resets preview/artifact state as intended.
+- **Windows Build:** ✅ **Built by CI, installed, and verified for 0.2.1.**
+  - Built by the `Release Windows` workflow (run `43558939733`, 5m56s, `windows-latest`) from tag `v0.2.1` at `a858903`, using the same `build-windows.ps1` the ThinkCentre uses.
+  - NSIS installer: 4,298,813 bytes — SHA-256 `775356C5D68C1A7623EB1817138750BBF30A454F71B90928083DDF1F03E7AAF6`
+  - MSI: 6,410,240 bytes
+  - Installed on the ThinkCentre; `app.exe` reports file/product version `0.2.1` (18,918,912 bytes).
+  - Verified on that installed build via WebView2 remote debugging (port 9222):
+    - All storage modules load over `http://tauri.localhost/` (`src/index.js` + 7 modules, HTTP 200); `window.storage` initialised with all five managers.
+    - `FreeLLMAPI connected (http://127.0.0.1:31415)`; "Load FreeLLMAPI Models" loaded 399 models.
+    - Artifact "Save As…" wrote `ci-artifact.md` into the folder picked in the native dialog; `Documents\Roundtable` stayed empty.
+    - Updater `check()` returns `null` without error (already on 0.2.1).
+    - Turn Rules is the default active tab; prompt textarea `min-height` is 120px.
   - `cargo test` passes (2 Rust tests for safe artifact filenames).
-  - GitHub Actions `release.yml` remains manual-dispatch for optional runner builds.
+
+- **Windows release status:** ✅ **Published on `v0.2.1`.**
+  - Assets: `Roundtable_0.2.1_x64-setup.exe` and `Roundtable_0.2.1_x64_en-US.msi`.
+  - The release's `updates.json` carries **both** `darwin-aarch64` and `windows-x86_64`, signed with key id `6E8C99D71D9B2B5A`.
+  - Signature verified out-of-band against the pubkey baked into `src-tauri/tauri.conf.json`: minisign prehashed mode (`ED`), BLAKE2b-512 over the installer, key id matches. This is the exact check the updater performs on download.
+  - Tag `v0.2.1` points at `a858903`, the exact commit the workflow built.
+
+  **Release process (one path, used locally and in CI):**
+  1. Bump `version` in `src-tauri/tauri.conf.json` (and `package.json`), commit, push.
+  2. Tag it: `git tag v<version>; git push origin v<version>` (the workflow will create the tag if you skip this).
+  3. Run **Release Windows** (`.github/workflows/release.yml`):
+     ```powershell
+     gh workflow run release.yml `
+       --repo Just-Me-Media/FreeLLMAPI-Roundtable --ref v0.2.1
+     ```
+     It runs `build-windows.ps1` on `windows-latest` (the same script the
+     ThinkCentre uses), signs the NSIS installer with the
+     `TAURI_SIGNING_PRIVATE_KEY` secret, merges the `windows-x86_64` entry into
+     the release's `updates.json` (keeping `darwin-aarch64`) and publishes the
+     NSIS + MSI installers.
+  - The tag is derived from `tauri.conf.json`, so a tag can never disagree with
+    the binaries inside it. Dispatching a branch whose tag already points at
+    other code fails on purpose.
+  - Local build for testing (no publishing):
+    `powershell -ExecutionPolicy Bypass -File .\build-windows.ps1`
+  - GitHub Actions minutes are free for public repositories, so this costs
+    nothing.
+
+  **Signing key:** the only valid private key is the repo secret
+  `TAURI_SIGNING_PRIVATE_KEY` (key id `6E8C99D71D9B2B5A`). No key file lives in
+  the tree; `.gitignore` excludes `*.key` and `*.sig`. The stale
+  `src-tauri/updater.key` (key id `13FADAED9706926B`, not trusted by the app) was
+  removed and backed up to
+  `C:\Temp\Roundtable\stale-updater-13FADAED9706926B.key.bak`.
+
+  **One-time migration:** the signing key was rotated in 0.2.1 (old key id
+  `D2B0F1370F1F4C9D`). Builds of **0.2.0 and older will reject the 0.2.1 update**
+  because they still trust the old key, so anyone on 0.2.0 must install 0.2.1
+  manually once. From 0.2.1 onward auto-update works normally.
 
 ## Build checklist (Windows ThinkCentre)
 
@@ -35,7 +70,7 @@
 
 2. Frontend dist
    - `dist/index.html` must exist before Tauri bundling
-   - `build-windows.ps1` copies `index.html` → `dist/`. `beforeBuildCommand` cleared to avoid POSIX commands.
+   - `build-windows.ps1` copies `index.html` → `dist/` and `src/` → `dist/src/` (the bundled app imports `./src/index.js`). `tauri.windows.conf.json` repeats this copy in its PowerShell `beforeBuildCommand` so CI builds get it too.
 
 3. Tauri Windows config
    - `src-tauri/tauri.windows.conf.json` used
